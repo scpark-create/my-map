@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>RECO Manager - 열 순서 최적화</title>
+    <title>RECO Manager - 검색 및 위치추적</title>
     <style>
         :root { --primary-color: #4285f4; --danger-color: #ff4757; --kakao-yellow: #FFEB00; }
         body, html { margin: 0; padding: 0; height: 100%; font-family: -apple-system, sans-serif; overflow: hidden; background: #f8f9fa; }
@@ -16,9 +16,18 @@
         #main-content { display: none; position: relative; width: 100%; height: 100%; }
         #map { width: 100%; height: 100%; }
 
-        .bottom-nav { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); z-index: 10; display: flex; gap: 10px; background: rgba(255,255,255,0.9); padding: 12px 20px; border-radius: 50px; box-shadow: 0 8px 32px rgba(0,0,0,0.15); backdrop-filter: blur(10px); width: 90%; max-width: 400px; justify-content: space-around; }
-        .nav-btn { border: none; background: none; font-size: 12px; font-weight: bold; display: flex; flex-direction: column; align-items: center; color: #666; cursor: pointer; }
+        /* 좌측 상단 검색창 */
+        #search-box { position: absolute; top: 20px; left: 20px; z-index: 20; width: 250px; }
+        #search-input { width: 100%; padding: 12px 15px; border-radius: 12px; border: none; box-shadow: 0 4px 15px rgba(0,0,0,0.15); font-size: 14px; outline: none; }
+        #search-results { position: absolute; width: 100%; background: white; border-radius: 12px; margin-top: 5px; max-height: 200px; overflow-y: auto; display: none; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        .result-item { padding: 12px 15px; border-bottom: 1px solid #eee; cursor: pointer; font-size: 13px; }
+        .result-item:last-child { border: none; }
+
+        /* 하단 네비게이션 바 (나의 위치 찾기 추가) */
+        .bottom-nav { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); z-index: 10; display: flex; gap: 5px; background: rgba(255,255,255,0.9); padding: 12px 15px; border-radius: 50px; box-shadow: 0 8px 32px rgba(0,0,0,0.15); backdrop-filter: blur(10px); width: 92%; max-width: 450px; justify-content: space-around; }
+        .nav-btn { border: none; background: none; font-size: 11px; font-weight: bold; display: flex; flex-direction: column; align-items: center; color: #666; cursor: pointer; white-space: nowrap; }
         .nav-btn.active { color: var(--primary-color); }
+        .nav-btn.gps-btn { color: #34a853; } /* 위치 찾기 버튼 전용 색상 */
         
         .logout-pill { position: absolute; top: 20px; right: 20px; z-index: 10; background: var(--danger-color); color: white; border: none; padding: 10px 18px; border-radius: 25px; font-weight: bold; font-size: 12px; }
         .info-content { padding: 10px; min-width: 210px; line-height: 1.5; }
@@ -40,10 +49,23 @@
 </div>
 
 <div id="main-content">
+    <div id="search-box">
+        <input type="text" id="search-input" placeholder="업장명 검색..." oninput="handleSearch()">
+        <div id="search-results"></div>
+    </div>
+
     <button class="logout-pill" onclick="location.reload()">로그아웃</button>
+    
     <div class="bottom-nav">
-        <button id="btn-existing" class="nav-btn active" onclick="toggleFilter('existing')">● 기존고객</button>
-        <button id="btn-new" class="nav-btn active" onclick="toggleFilter('new')">★ 나의영업</button>
+        <button class="nav-btn gps-btn" onclick="moveToCurrentLocation()">
+            <span style="font-size:16px;">📍</span><span>나의 위치 찾기</span>
+        </button>
+        <button id="btn-existing" class="nav-btn active" onclick="toggleFilter('existing')">
+            <span style="font-size:16px;">●</span><span>기존고객</span>
+        </button>
+        <button id="btn-new" class="nav-btn active" onclick="toggleFilter('new')">
+            <span style="font-size:16px;">★</span><span>나의영업</span>
+        </button>
     </div>
     <div id="map"></div>
 </div>
@@ -59,6 +81,7 @@ const leadFormUrl = 'https://walla.my/v/GEQSSOWtFYHulcSoAKC3';
 let map, geocoder, userLatLng = null, allMarkers = [], infoWindows = [], filterStatus = { existing: true, new: true };
 let userRole = "saler"; 
 let userLimitRange = 1000; 
+let userMarker = null; // 현재 위치 표시용 커스텀 오버레이
 
 async function checkLogin() {
     const userIn = document.getElementById('username').value.trim();
@@ -100,17 +123,41 @@ function initApp() {
     map = new kakao.maps.Map(document.getElementById('map'), { center: userLatLng, level: 4 });
     geocoder = new kakao.maps.services.Geocoder();
     
+    updateUserMarker();
+    loadData();
+
+    // 지도 클릭 시 검색 결과 닫기
+    kakao.maps.event.addListener(map, 'click', () => {
+        document.getElementById('search-results').style.display = 'none';
+    });
+}
+
+// 내 위치 찾기 버튼 로직
+function moveToCurrentLocation() {
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition((pos) => {
+            userLatLng = new kakao.maps.LatLng(pos.coords.latitude, pos.coords.longitude);
+            map.panTo(userLatLng);
+            updateUserMarker();
+        }, () => {
+            alert("현재 위치를 가져올 수 없습니다.");
+        }, { enableHighAccuracy: true });
+    }
+}
+
+// 내 위치 파란 점 갱신
+function updateUserMarker() {
+    if (userMarker) userMarker.setMap(null);
     if(userLatLng) {
-        new kakao.maps.CustomOverlay({
+        userMarker = new kakao.maps.CustomOverlay({
             position: userLatLng,
             content: '<div style="width:14px;height:14px;background:#4285f4;border:3px solid white;border-radius:50%;box-shadow:0 0 8px rgba(0,0,0,0.3);"></div>'
-        }).setMap(map);
+        });
+        userMarker.setMap(map);
     }
-    loadData();
 }
 
 async function loadData() {
-    // 1. 고객(기존) 탭: A상호(0), B주소(1), E메모(4), F단가(5), G배출량(6), H차량(7)
     const resExist = await fetch(existingCsvUrl + '&t=' + new Date().getTime());
     const rowsExist = (await resExist.text()).split(/\r?\n/).filter(r => r.trim()).slice(1);
     for (const row of rowsExist) {
@@ -118,8 +165,6 @@ async function loadData() {
         await createMarkerAsync(c[1], c[0], c[4], c[5], c[6], c[7], 'existing');
     }
 
-    // 2. 영업 탭: A상호(0), B주소(1), E메모(4), F단가(5), G배출량(6), H차량(7)
-    // 두 탭의 구조를 동일하게 맞춤 (상호명 앞, 주소 뒤)
     const resSales = await fetch(salesCsvUrl + '&t=' + new Date().getTime());
     const rowsSales = (await resSales.text()).split(/\r?\n/).filter(r => r.trim()).slice(1);
     for (const row of rowsSales) {
@@ -135,7 +180,6 @@ function createMarkerAsync(addr, name, memo, price, amount, vehicle, type) {
             if (status === kakao.maps.services.Status.OK) {
                 const coords = new kakao.maps.LatLng(result[0].y, result[0].x);
                 
-                // saler 권한일 때만 반경 필터링 적용
                 if (userRole === 'saler' && userLatLng) {
                     const poly = new kakao.maps.Polyline({ path: [userLatLng, coords] });
                     if (poly.getLength() > userLimitRange) return resolve();
@@ -148,6 +192,7 @@ function createMarkerAsync(addr, name, memo, price, amount, vehicle, type) {
                 });
                 
                 marker.customerType = type;
+                marker.customerName = name; // 검색용 데이터 저장
                 allMarkers.push(marker);
 
                 const iwContent = `
@@ -162,6 +207,8 @@ function createMarkerAsync(addr, name, memo, price, amount, vehicle, type) {
                     </div>`;
 
                 const iw = new kakao.maps.InfoWindow({ content: iwContent, removable: true });
+                marker.infoWindow = iw; // 검색 연동용
+
                 kakao.maps.event.addListener(marker, 'click', () => {
                     infoWindows.forEach(w => w.close());
                     iw.open(map, marker);
@@ -171,6 +218,38 @@ function createMarkerAsync(addr, name, memo, price, amount, vehicle, type) {
             resolve();
         });
     });
+}
+
+// 검색 기능 핸들러
+function handleSearch() {
+    const val = document.getElementById('search-input').value.trim().toLowerCase();
+    const results = document.getElementById('search-results');
+    results.innerHTML = '';
+    
+    if(!val) { results.style.display = 'none'; return; }
+
+    const filtered = allMarkers.filter(m => m.customerName.toLowerCase().includes(val));
+
+    if(filtered.length > 0) {
+        results.style.display = 'block';
+        filtered.forEach(m => {
+            const div = document.createElement('div');
+            div.className = 'result-item';
+            div.innerHTML = `<strong>${m.customerName}</strong> <span style="font-size:10px; color:#999;">(${m.customerType === 'existing' ? '기존' : '영업'})</span>`;
+            div.onclick = () => {
+                map.panTo(m.getPosition());
+                map.setLevel(3);
+                infoWindows.forEach(w => w.close());
+                m.infoWindow.open(map, m);
+                infoWindows.push(m.infoWindow);
+                results.style.display = 'none';
+                document.getElementById('search-input').value = m.customerName;
+            };
+            results.appendChild(div);
+        });
+    } else {
+        results.style.display = 'none';
+    }
 }
 
 function toggleFilter(type) {
