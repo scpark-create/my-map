@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>리코 고객관리 매니저</title>
+    
+    <style>
+        :root {
+            --primary-color: #4285f4;
+            --danger-color: #ff4757;
+            --kakao-yellow: #FFEB00;
+        }
+
+        body, html { margin: 0; padding: 0; height: 100%; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; overflow: hidden; }
+        
+        /* 로그인 화면 최적화 */
+        #login-container { 
+            display: flex; flex-direction: column; align-items: center; justify-content: center; 
+            height: 100vh; background: #f8f9fa; padding: 20px; box-sizing: border-box;
+        }
+        .login-box { 
+            width: 100%; max-width: 340px; padding: 30px; background: white;
+            border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); text-align: center; 
+        }
+        .login-box h2 { margin-top: 0; color: var(--primary-color); font-size: 24px; }
+        .login-box input { 
+            width: 100%; padding: 15px; margin: 10px 0; border: 1px solid #eee; 
+            border-radius: 12px; font-size: 16px; background: #fafafa; box-sizing: border-box;
+        }
+        .login-box button { 
+            width: 100%; padding: 15px; background: var(--primary-color); color: white; 
+            border: none; border-radius: 12px; font-size: 18px; font-weight: bold; margin-top: 10px;
+        }
+
+        /* 메인 지도 UI 최적화 */
+        #main-content { display: none; position: relative; width: 100%; height: 100%; }
+        #map { width: 100%; height: 100%; }
+
+        /* 하단 컨트롤 바 (모바일 앱 스타일) */
+        .bottom-nav {
+            position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%);
+            z-index: 10; display: flex; gap: 10px; background: rgba(255,255,255,0.9);
+            padding: 12px 20px; border-radius: 50px; box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+            backdrop-filter: blur(10px); width: 85%; max-width: 400px; justify-content: space-around;
+        }
+        .nav-btn {
+            border: none; background: none; font-size: 12px; font-weight: bold;
+            display: flex; flex-direction: column; align-items: center; cursor: pointer; color: #666;
+        }
+        .nav-btn.active { color: var(--primary-color); }
+        .nav-btn .icon { font-size: 20px; margin-bottom: 3px; }
+
+        .logout-pill {
+            position: absolute; top: 20px; right: 20px; z-index: 10;
+            background: rgba(255, 71, 87, 0.9); color: white; border: none;
+            padding: 8px 15px; border-radius: 20px; font-weight: bold; font-size: 12px;
+        }
+
+        /* 인포윈도우 모바일 최적화 */
+        .info-content { padding: 15px; min-width: 200px; border-radius: 10px; }
+        .bg-existing { background-color: #f1f2f6; }
+        .bg-new { background-color: #ffffff; }
+        .action-btn { 
+            display: block; margin-top: 10px; padding: 12px; 
+            text-decoration: none; border-radius: 8px; font-weight: bold; 
+            font-size: 14px; text-align: center; 
+        }
+        .lead-btn { background: #6c5ce7; color: white; }
+        .navi-btn { background: var(--kakao-yellow); color: #3C1E1E; }
+    </style>
+</head>
+<body>
+
+<div id="login-container">
+    <div class="login-box">
+        <h2>RECO Manager</h2>
+        <input type="text" id="username" placeholder="아이디" autocomplete="off">
+        <input type="password" id="password" placeholder="비밀번호">
+        <button id="login-btn" onclick="checkLogin()">로그인 시작</button>
+        <p id="error-msg" style="color:red; font-size:12px; margin-top:15px; display:none;">로그인 정보가 올바르지 않습니다.</p>
+    </div>
+</div>
+
+<div id="main-content">
+    <button class="logout-pill" onclick="location.reload()">로그아웃</button>
+    
+    <div class="bottom-nav">
+        <button id="btn-existing" class="nav-btn active" onclick="toggleFilter('existing')">
+            <span class="icon">●</span><span>기존고객</span>
+        </button>
+        <button id="btn-new" class="nav-btn active" onclick="toggleFilter('new')">
+            <span class="icon">★</span><span>나의신규</span>
+        </button>
+    </div>
+    
+    <div id="map"></div>
+</div>
+
+<script type="text/javascript" src="//dapi.kakao.com/v2/maps/sdk.js?appkey=674d9cff0f9b5e8d49e24339fdc1c033&libraries=services"></script>
+
+<script>
+const loginCsvUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTMzDZTY1xtxilWxjwwUhjXnIFis1P7BxLP8j6csZKBOdmg66V4vlPoTSo66hXvokDY87bGvVPY9vBm/pub?gid=1603902648&single=true&output=csv';
+const dataCsvUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTMzDZTY1xtxilWxjwwUhjXnIFis1P7BxLP8j6csZKBOdmg66V4vlPoTSo66hXvokDY87bGvVPY9vBm/pub?output=csv';
+const leadFormUrl = 'https://walla.my/v/GEQSSOWtFYHulcSoAKC3';
+
+let map, geocoder, allMarkers = [], infoWindows = [], filterStatus = { existing: true, new: true };
+let currentLoginId = ""; 
+
+async function checkLogin() {
+    const userIn = document.getElementById('username').value.trim();
+    const passIn = document.getElementById('password').value.trim();
+    if(!userIn || !passIn) return;
+
+    try {
+        const res = await fetch(loginCsvUrl + '&t=' + new Date().getTime());
+        const text = await res.text();
+        const rows = text.split(/\r?\n/).slice(1);
+        let auth = false;
+        for (let row of rows) {
+            const [id, pw] = row.split(',').map(c => c.replace(/^"|"$/g, '').trim());
+            if (id === userIn && pw === passIn) { auth = true; currentLoginId = id; break; }
+        }
+        if (auth) {
+            document.getElementById('login-container').style.display = 'none';
+            document.getElementById('main-content').style.display = 'block';
+            initMap();
+        } else { document.getElementById('error-msg').style.display = 'block'; }
+    } catch (e) { alert("로그인 서버 연결 오류"); }
+}
+
+function initMap() {
+    map = new kakao.maps.Map(document.getElementById('map'), { center: new kakao.maps.LatLng(37.5668, 126.9786), level: 7 });
+    geocoder = new kakao.maps.services.Geocoder();
+    fetchCustomerData();
+}
+
+async function fetchCustomerData() {
+    try {
+        const res = await fetch(dataCsvUrl + '&t=' + new Date().getTime());
+        const data = await res.text();
+        const rows = data.split(/\r?\n/).slice(1);
+        const bounds = new kakao.maps.LatLngBounds();
+
+        rows.forEach(row => {
+            const cols = row.split(',').map(c => c.replace(/^"|"$/g, '').trim());
+            if (cols.length < 10) return; 
+
+            const [name, address, d1, d2, type, memo, ownerId, price, amount, vehicle] = cols;
+            const cleanType = type.toLowerCase();
+            let isVisible = (cleanType === 'existing') || (cleanType === 'new' && ownerId === currentLoginId);
+
+            if (isVisible) {
+                geocoder.addressSearch(address, function(result, status) {
+                    if (status === kakao.maps.services.Status.OK) {
+                        const coords = new kakao.maps.LatLng(result[0].y, result[0].x);
+                        let markerImage = (cleanType === 'existing') ? null : new kakao.maps.MarkerImage('https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/markerStar.png', new kakao.maps.Size(24, 35));
+
+                        const marker = new kakao.maps.Marker({ position: coords, image: markerImage, map: map });
+                        marker.customerType = cleanType;
+                        allMarkers.push(marker);
+                        bounds.extend(coords);
+
+                        const iw = new kakao.maps.InfoWindow({
+                            content: `
+                                <div class="info-content ${cleanType === 'existing' ? 'bg-existing' : 'bg-new'}">
+                                    <b style="font-size:16px;">${name}</b><br>
+                                    <small style="color:#666">${address}</small>
+                                    <div style="background:rgba(0,0,0,0.05); padding:8px; border-radius:8px; margin:8px 0; font-size:12px;">
+                                        단가: ${price} | 배출: ${amount}<br>차량: ${vehicle}
+                                    </div>
+                                    <div style="font-size:11px; margin-bottom:8px;">${memo}</div>
+                                    ${cleanType === 'new' ? `<a href="${leadFormUrl}" target="_blank" class="action-btn lead-btn">📝 영업 리드 기입</a>` : ''}
+                                    <a href="https://map.kakao.com/link/to/${encodeURIComponent(name)},${result[0].y},${result[0].x}" target="_blank" class="action-btn navi-btn">🚕 카카오 길찾기</a>
+                                </div>`,
+                            removable: true
+                        });
+                        infoWindows.push(iw);
+                        kakao.maps.event.addListener(marker, 'click', () => {
+                            infoWindows.forEach(w => w.close());
+                            iw.open(map, marker);
+                        });
+                        map.setBounds(bounds);
+                    }
+                });
+            }
+        });
+    } catch (e) { console.error(e); }
+}
+
+function toggleFilter(type) {
+    infoWindows.forEach(w => w.close());
+    filterStatus[type] = !filterStatus[type];
+    document.getElementById('btn-' + type).classList.toggle('active', filterStatus[type]);
+    allMarkers.forEach(m => { if (m.customerType === type) m.setMap(filterStatus[type] ? map : null); });
+}
+</script>
+</body>
+</html>
