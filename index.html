@@ -3,69 +3,76 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>RECO Manager - 검색 및 위치추적</title>
+    <title>RECO Manager - 지역 필터 최적화</title>
     <style>
-        :root { --primary-color: #4285f4; --danger-color: #ff4757; --kakao-yellow: #FFEB00; }
+        :root { --primary-red: #ff4757; --primary-blue: #007bff; --kakao-yellow: #FFEB00; --lead-green: #2ecc71; }
         body, html { margin: 0; padding: 0; height: 100%; font-family: -apple-system, sans-serif; overflow: hidden; background: #f8f9fa; }
         
+        /* 로그인 UI */
         #login-container { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; padding: 20px; box-sizing: border-box; }
         .login-box { width: 100%; max-width: 340px; padding: 30px; background: white; border-radius: 24px; box-shadow: 0 15px 35px rgba(0,0,0,0.1); text-align: center; }
-        .login-box input { width: 100%; padding: 15px; margin: 10px 0; border: 1px solid #eee; border-radius: 12px; font-size: 16px; width: 100%; box-sizing: border-box; outline: none; background: #fdfdfd; }
-        .login-box button { width: 100%; padding: 16px; background: var(--primary-color); color: white; border: none; border-radius: 12px; font-size: 18px; font-weight: bold; cursor: pointer; }
+        .login-box input { width: 100%; padding: 15px; margin: 10px 0; border: 1px solid #eee; border-radius: 12px; font-size: 16px; width: 100%; box-sizing: border-box; outline: none; }
+        .login-box button { width: 100%; padding: 16px; background: #4285f4; color: white; border: none; border-radius: 12px; font-size: 18px; font-weight: bold; cursor: pointer; }
 
         #main-content { display: none; position: relative; width: 100%; height: 100%; }
         #map { width: 100%; height: 100%; }
 
-        /* 좌측 상단 검색창 */
-        #search-box { position: absolute; top: 20px; left: 20px; z-index: 20; width: 250px; }
-        #search-input { width: 100%; padding: 12px 15px; border-radius: 12px; border: none; box-shadow: 0 4px 15px rgba(0,0,0,0.15); font-size: 14px; outline: none; }
-        #search-results { position: absolute; width: 100%; background: white; border-radius: 12px; margin-top: 5px; max-height: 200px; overflow-y: auto; display: none; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
-        .result-item { padding: 12px 15px; border-bottom: 1px solid #eee; cursor: pointer; font-size: 13px; }
-        .result-item:last-child { border: none; }
+        /* 버튼 그룹 */
+        .side-btns { position: absolute; top: 20px; right: 20px; z-index: 20; display: flex; flex-direction: column; gap: 10px; }
+        .side-btn { padding: 10px 18px; border-radius: 25px; border: none; font-weight: bold; font-size: 12px; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
+        .logout-pill { background: var(--primary-red); color: white; }
+        .rv-btn { background: #333; color: white; }
 
-        /* 하단 네비게이션 바 (나의 위치 찾기 추가) */
+        /* 하단 필터 바 */
         .bottom-nav { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); z-index: 10; display: flex; gap: 5px; background: rgba(255,255,255,0.9); padding: 12px 15px; border-radius: 50px; box-shadow: 0 8px 32px rgba(0,0,0,0.15); backdrop-filter: blur(10px); width: 92%; max-width: 450px; justify-content: space-around; }
-        .nav-btn { border: none; background: none; font-size: 11px; font-weight: bold; display: flex; flex-direction: column; align-items: center; color: #666; cursor: pointer; white-space: nowrap; }
-        .nav-btn.active { color: var(--primary-color); }
-        .nav-btn.gps-btn { color: #34a853; } /* 위치 찾기 버튼 전용 색상 */
-        
-        .logout-pill { position: absolute; top: 20px; right: 20px; z-index: 10; background: var(--danger-color); color: white; border: none; padding: 10px 18px; border-radius: 25px; font-weight: bold; font-size: 12px; }
-        .info-content { padding: 10px; min-width: 210px; line-height: 1.5; }
-        .action-btn { display: block; margin-top: 8px; padding: 12px; text-decoration: none; border-radius: 10px; font-weight: bold; font-size: 13px; text-align: center; }
-        .lead-btn { background: #6c5ce7; color: white; margin-bottom: 5px; }
+        .nav-btn { border: none; background: none; font-size: 11px; font-weight: bold; display: flex; flex-direction: column; align-items: center; color: #999; cursor: pointer; }
+        #btn-existing.active { color: var(--primary-red) !important; }
+        #btn-new.active { color: var(--primary-blue) !important; }
+
+        /* 마커 스타일 */
+        .mini-dot { width: 8px; height: 8px; border: 1.5px solid #fff; border-radius: 50%; cursor: pointer; box-shadow: 0 0 3px rgba(0,0,0,0.4); }
+        .mini-dot.existing { background: var(--primary-red); }
+        .star-marker { color: var(--primary-blue); font-size: 20px; text-shadow: 0 0 3px #fff; cursor: pointer; transform: translate(-2px, -8px); font-weight: bold; }
+
+        /* 무지개 위치 마커 */
+        @keyframes rainbow { 0% { background: #ff0000; } 20% { background: #ffcc00; } 40% { background: #00ff00; } 60% { background: #00ffff; } 80% { background: #0000ff; } 100% { background: #ff00ff; } }
+        .user-dot { width: 14px; height: 14px; border: 3px solid white; border-radius: 50%; animation: rainbow 2s infinite linear; box-shadow: 0 0 10px rgba(0,0,0,0.5); }
+
+        .info-content { padding: 10px; min-width: 240px; font-size: 13px; }
+        .action-btn { display: block; padding: 10px; margin-top: 5px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 12px; text-align: center; }
         .navi-btn { background: var(--kakao-yellow); color: #3C1E1E; }
+        .lead-btn { background: var(--lead-green); color: white; }
+
+        #rv-container { position: absolute; top: 10%; left: 5%; width: 90%; height: 70%; z-index: 100; display: none; background: white; border-radius: 15px; overflow: hidden; box-shadow: 0 10px 40px rgba(0,0,0,0.4); }
     </style>
 </head>
 <body>
 
 <div id="login-container">
     <div class="login-box">
-        <h2 style="color:#333;">RECO Manager</h2>
-        <input type="text" id="username" placeholder="아이디" autocomplete="off">
+        <h2>RECO Manager</h2>
+        <input type="text" id="username" placeholder="아이디">
         <input type="password" id="password" placeholder="비밀번호">
         <button onclick="checkLogin()">접속하기</button>
-        <p id="error-msg" style="color:var(--danger-color); font-size:12px; display:none; margin-top:15px;">정보가 일치하지 않습니다.</p>
+        <p id="error-msg" style="color:var(--primary-red); font-size:12px; display:none; margin-top:15px;">정보가 일치하지 않습니다.</p>
     </div>
 </div>
 
 <div id="main-content">
-    <div id="search-box">
-        <input type="text" id="search-input" placeholder="업장명 검색..." oninput="handleSearch()">
-        <div id="search-results"></div>
+    <div class="side-btns">
+        <button class="side-btn logout-pill" onclick="location.reload()">로그아웃</button>
+        <button id="rv-toggle-btn" class="side-btn rv-btn" onclick="toggleRoadviewMode()">📷 로드뷰 모드</button>
     </div>
 
-    <button class="logout-pill" onclick="location.reload()">로그아웃</button>
-    
+    <div id="rv-container">
+        <button style="position:absolute; top:10px; right:10px; z-index:101;" onclick="closeRoadview()">닫기</button>
+        <div id="roadview" style="width:100%;height:100%;"></div>
+    </div>
+
     <div class="bottom-nav">
-        <button class="nav-btn gps-btn" onclick="moveToCurrentLocation()">
-            <span style="font-size:16px;">📍</span><span>나의 위치 찾기</span>
-        </button>
-        <button id="btn-existing" class="nav-btn active" onclick="toggleFilter('existing')">
-            <span style="font-size:16px;">●</span><span>기존고객</span>
-        </button>
-        <button id="btn-new" class="nav-btn active" onclick="toggleFilter('new')">
-            <span style="font-size:16px;">★</span><span>나의영업</span>
-        </button>
+        <button class="nav-btn" style="color: #34a853;" onclick="moveToCurrentLocation()">📍<span>나의 위치</span></button>
+        <button id="btn-existing" class="nav-btn active" onclick="toggleFilter('existing')">●<span>기존고객</span></button>
+        <button id="btn-new" class="nav-btn active" onclick="toggleFilter('new')">★<span>나의영업</span></button>
     </div>
     <div id="map"></div>
 </div>
@@ -76,188 +83,153 @@
 const loginCsvUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTMzDZTY1xtxilWxjwwUhjXnIFis1P7BxLP8j6csZKBOdmg66V4vlPoTSo66hXvokDY87bGvVPY9vBm/pub?gid=1603902648&single=true&output=csv';
 const existingCsvUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTMzDZTY1xtxilWxjwwUhjXnIFis1P7BxLP8j6csZKBOdmg66V4vlPoTSo66hXvokDY87bGvVPY9vBm/pub?gid=0&single=true&output=csv';
 const salesCsvUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTMzDZTY1xtxilWxjwwUhjXnIFis1P7BxLP8j6csZKBOdmg66V4vlPoTSo66hXvokDY87bGvVPY9vBm/pub?gid=676390554&single=true&output=csv';
-const leadFormUrl = 'https://walla.my/v/GEQSSOWtFYHulcSoAKC3';
 
-let map, geocoder, userLatLng = null, allMarkers = [], infoWindows = [], filterStatus = { existing: true, new: true };
-let userRole = "saler"; 
-let userLimitRange = 1000; 
-let userMarker = null; // 현재 위치 표시용 커스텀 오버레이
+let map, rv, rvClient, userLatLng = null, allMarkers = [], filterStatus = { existing: true, new: true };
+let currentUserId = "", userRole = "saler", userLimitRange = 1000, userLimitArea = "", userMarker = null, rvMode = false;
+
+function cleanCoord(val) {
+    if (!val) return null;
+    let cleaned = val.toString().replace(/[^0-9.]/g, '');
+    return cleaned ? parseFloat(cleaned) : null;
+}
+
+// 지역 매칭 최적화 함수 (공백 제거 및 부분 일치 검사 강화)
+function isAreaMatch(addr, limitArea) {
+    if (!limitArea || limitArea === "" || limitArea === "전체") return true;
+    const cleanAddr = addr.replace(/\s/g, '');
+    const cleanLimit = limitArea.replace(/\s/g, '');
+    // 예: '경기도안양시'가 '경기안양시...'에 포함되거나 그 반대인 경우 체크
+    const shortLimit = cleanLimit.replace(/경기도/g, '경기').replace(/서울특별시/g, '서울').replace(/인천광역시/g, '인천');
+    return cleanAddr.includes(cleanLimit) || cleanAddr.includes(shortLimit);
+}
 
 async function checkLogin() {
-    const userIn = document.getElementById('username').value.trim();
+    const userIn = document.getElementById('username').value.trim().toLowerCase();
     const passIn = document.getElementById('password').value.trim();
     try {
-        const res = await fetch(loginCsvUrl + '&t=' + new Date().getTime());
+        const res = await fetch(loginCsvUrl + '&t=' + Date.now());
         const text = await res.text();
         const rows = text.split(/\r?\n/).slice(1);
         let auth = false;
         for (let row of rows) {
             const cols = row.split(',').map(c => c.replace(/^"|"$/g, '').trim());
-            if (cols[0] === userIn && cols[1] === passIn) { 
-                auth = true; 
-                userRole = cols[2] || "saler";
+            if (cols[0].toLowerCase() === userIn && cols[1] === passIn) { 
+                auth = true; currentUserId = userIn; userRole = cols[2].toLowerCase(); 
                 userLimitRange = parseInt(cols[3]) || 1000;
+                userLimitArea = cols[4] || ""; 
                 break; 
             }
         }
-        if (auth) { requestPosition(); } 
+        if (auth) { initApp(); requestPosition(); } 
         else { document.getElementById('error-msg').style.display = 'block'; }
-    } catch (e) { alert("로그인 서버 응답 없음"); }
+    } catch (e) { alert("연결 실패"); }
+}
+
+function initApp() {
+    document.getElementById('login-container').style.display = 'none';
+    document.getElementById('main-content').style.display = 'block';
+    map = new kakao.maps.Map(document.getElementById('map'), { center: new kakao.maps.LatLng(37.5668, 126.9786), level: 4 });
+    rvClient = new kakao.maps.RoadviewClient();
+    rv = new kakao.maps.Roadview(document.getElementById('roadview'));
+    kakao.maps.event.addListener(map, 'click', function(e) {
+        if (rvMode) {
+            rvClient.getNearestPanoId(e.latLng, 50, function(id) {
+                if (id) { document.getElementById('rv-container').style.display = 'block'; rv.setPanoId(id, e.latLng); }
+                else { alert("로드뷰 불가 지역입니다."); }
+            });
+        }
+    });
+    loadData();
 }
 
 function requestPosition() {
     if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition((pos) => {
             userLatLng = new kakao.maps.LatLng(pos.coords.latitude, pos.coords.longitude);
-            initApp();
-        }, () => {
-            userLatLng = new kakao.maps.LatLng(37.5668, 126.9786);
-            initApp();
-        }, { enableHighAccuracy: true });
-    } else { initApp(); }
-}
-
-function initApp() {
-    document.getElementById('login-container').style.display = 'none';
-    document.getElementById('main-content').style.display = 'block';
-    map = new kakao.maps.Map(document.getElementById('map'), { center: userLatLng, level: 4 });
-    geocoder = new kakao.maps.services.Geocoder();
-    
-    updateUserMarker();
-    loadData();
-
-    // 지도 클릭 시 검색 결과 닫기
-    kakao.maps.event.addListener(map, 'click', () => {
-        document.getElementById('search-results').style.display = 'none';
-    });
-}
-
-// 내 위치 찾기 버튼 로직
-function moveToCurrentLocation() {
-    if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition((pos) => {
-            userLatLng = new kakao.maps.LatLng(pos.coords.latitude, pos.coords.longitude);
             map.panTo(userLatLng);
             updateUserMarker();
-        }, () => {
-            alert("현재 위치를 가져올 수 없습니다.");
-        }, { enableHighAccuracy: true });
-    }
-}
-
-// 내 위치 파란 점 갱신
-function updateUserMarker() {
-    if (userMarker) userMarker.setMap(null);
-    if(userLatLng) {
-        userMarker = new kakao.maps.CustomOverlay({
-            position: userLatLng,
-            content: '<div style="width:14px;height:14px;background:#4285f4;border:3px solid white;border-radius:50%;box-shadow:0 0 8px rgba(0,0,0,0.3);"></div>'
+            refreshDataVisibility();
         });
-        userMarker.setMap(map);
     }
 }
 
 async function loadData() {
-    const resExist = await fetch(existingCsvUrl + '&t=' + new Date().getTime());
-    const rowsExist = (await resExist.text()).split(/\r?\n/).filter(r => r.trim()).slice(1);
-    for (const row of rowsExist) {
-        const c = row.split(',').map(v => v.replace(/^"|"$/g, '').trim());
-        await createMarkerAsync(c[1], c[0], c[4], c[5], c[6], c[7], 'existing');
-    }
-
-    const resSales = await fetch(salesCsvUrl + '&t=' + new Date().getTime());
-    const rowsSales = (await resSales.text()).split(/\r?\n/).filter(r => r.trim()).slice(1);
-    for (const row of rowsSales) {
-        const c = row.split(',').map(v => v.replace(/^"|"$/g, '').trim());
-        await createMarkerAsync(c[1], c[0], c[4], c[5], c[6], c[7], 'new');
-    }
+    const [resExist, resSales] = await Promise.all([ fetch(existingCsvUrl + '&t=' + Date.now()), fetch(salesCsvUrl + '&t=' + Date.now()) ]);
+    const txtExist = await resExist.text();
+    txtExist.split(/\r?\n/).slice(1).forEach(row => {
+        if(!row.trim()) return;
+        addMarkerToMap(row.split(',').map(v => v.replace(/^"|"$/g, '').trim()), 'existing');
+    });
+    const txtSales = await resSales.text();
+    txtSales.split(/\r?\n/).slice(1).forEach(row => {
+        if(!row.trim()) return;
+        addMarkerToMap(row.split(',').map(v => v.replace(/^"|"$/g, '').trim()), 'new');
+    });
+    refreshDataVisibility();
 }
 
-function createMarkerAsync(addr, name, memo, price, amount, vehicle, type) {
-    return new Promise((resolve) => {
-        if(!addr || addr.length < 5) return resolve();
-        geocoder.addressSearch(addr, (result, status) => {
-            if (status === kakao.maps.services.Status.OK) {
-                const coords = new kakao.maps.LatLng(result[0].y, result[0].x);
-                
-                if (userRole === 'saler' && userLatLng) {
-                    const poly = new kakao.maps.Polyline({ path: [userLatLng, coords] });
-                    if (poly.getLength() > userLimitRange) return resolve();
-                }
+function addMarkerToMap(c, type) {
+    let name, addr, lat, lng, iwContent, ownerId;
+    if (type === 'existing') {
+        name = c[0]; addr = c[1]; lat = cleanCoord(c[2]); lng = cleanCoord(c[3]);
+        iwContent = `<div class="info-content"><strong>${name}</strong><br><small>${addr}</small><br>
+            <a href="https://map.kakao.com/link/to/${encodeURIComponent(name)},${lat},${lng}" target="_blank" class="action-btn navi-btn">🚕 길찾기</a></div>`;
+    } else {
+        ownerId = c[0] ? c[0].toLowerCase().trim() : "";
+        name = c[1]; addr = c[2]; lat = cleanCoord(c[3]); lng = cleanCoord(c[4]);
+        iwContent = `<div class="info-content"><strong>${name} (영업)</strong><br><small>${addr}</small><br>
+            <a href="https://map.kakao.com/link/to/${encodeURIComponent(name)},${lat},${lng}" target="_blank" class="action-btn navi-btn">🚕 길찾기</a>
+            <a href="https://form.naver.com/" target="_blank" class="action-btn lead-btn">📝 영업리드 등록</a></div>`;
+    }
+    if (!lat || !lng) return;
+    const coords = new kakao.maps.LatLng(lat, lng);
+    const hiddenMarker = new kakao.maps.Marker({ position: coords, image: new kakao.maps.MarkerImage('https://t1.daumcdn.net/localimg/localimages/07/mapjsapi/2.0/point.png', new kakao.maps.Size(1, 1)), opacity: 0 });
+    
+    const overlayContent = document.createElement('div');
+    overlayContent.className = (type === 'existing') ? 'mini-dot existing' : 'star-marker';
+    overlayContent.innerHTML = (type === 'existing') ? '' : '★';
 
-                const marker = new kakao.maps.Marker({ 
-                    position: coords, 
-                    image: (type === 'new' ? new kakao.maps.MarkerImage('https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/markerStar.png', new kakao.maps.Size(24, 35)) : null), 
-                    map: map 
-                });
-                
-                marker.customerType = type;
-                marker.customerName = name; // 검색용 데이터 저장
-                allMarkers.push(marker);
+    const overlay = new kakao.maps.CustomOverlay({ position: coords, content: overlayContent, clickable: true });
+    const iw = new kakao.maps.InfoWindow({ content: iwContent, removable: true });
 
-                const iwContent = `
-                    <div class="info-content" style="background-color:${type === 'existing' ? '#e9ecef' : '#fff'}">
-                        <strong>${name}</strong><br><small>${addr}</small>
-                        <div style="background:rgba(0,0,0,0.05); padding:8px; border-radius:8px; margin:8px 0; font-size:12px;">
-                            단가: ${price || '-'} | 배출: ${amount || '-'}<br>차량: ${vehicle || '-'}
-                        </div>
-                        <div style="font-size:11px; margin-bottom:8px; color:#444;">${memo || ''}</div>
-                        ${type === 'new' ? `<a href="${leadFormUrl}" target="_blank" class="action-btn lead-btn">📝 영업 리드 기입</a>` : ''}
-                        <a href="https://map.kakao.com/link/to/${encodeURIComponent(name)},${result[0].y},${result[0].x}" target="_blank" class="action-btn navi-btn">🚕 카카오 길찾기</a>
-                    </div>`;
+    overlayContent.onclick = () => { if (rvMode) return; map.panTo(coords); allMarkers.forEach(m => m.iw.close()); iw.open(map, hiddenMarker); };
+    allMarkers.push({ customerType: type, overlay, hiddenMarker, iw, pos: coords, addr, ownerId });
+}
 
-                const iw = new kakao.maps.InfoWindow({ content: iwContent, removable: true });
-                marker.infoWindow = iw; // 검색 연동용
+function refreshDataVisibility() {
+    allMarkers.forEach(m => {
+        let isVisible = false;
+        const isMaster = (userRole === 'master');
+        
+        // 1. 반경 내 존재 여부 확인 (GPS 기반)
+        let rangeMatch = false;
+        if (userLatLng) {
+            const line = new kakao.maps.Polyline({ path: [userLatLng, m.pos] });
+            if (line.getLength() <= userLimitRange) rangeMatch = true;
+        }
 
-                kakao.maps.event.addListener(marker, 'click', () => {
-                    infoWindows.forEach(w => w.close());
-                    iw.open(map, marker);
-                    infoWindows.push(iw);
-                });
-            }
-            resolve();
-        });
+        // 2. 담당 지역 일치 여부 확인 (주소 텍스트 기반)
+        const areaMatch = isAreaMatch(m.addr, userLimitArea);
+
+        // 3. 데이터 권한 확인 (기존고객은 공용, 영업은 마스터 혹은 본인 데이터만)
+        const isMyData = (m.customerType === 'existing' || isMaster || (m.ownerId === currentUserId));
+
+        // [핵심 로직] 마스터이거나, (내 데이터이면서 (반경 내 혹은 지역 일치)) 하는 경우 노출
+        if (isMaster || (isMyData && (rangeMatch || areaMatch))) {
+            isVisible = filterStatus[m.customerType];
+        }
+        
+        m.overlay.setMap(isVisible ? map : null);
+        m.hiddenMarker.setMap(isVisible ? map : null);
+        if (!isVisible) m.iw.close();
     });
 }
 
-// 검색 기능 핸들러
-function handleSearch() {
-    const val = document.getElementById('search-input').value.trim().toLowerCase();
-    const results = document.getElementById('search-results');
-    results.innerHTML = '';
-    
-    if(!val) { results.style.display = 'none'; return; }
-
-    const filtered = allMarkers.filter(m => m.customerName.toLowerCase().includes(val));
-
-    if(filtered.length > 0) {
-        results.style.display = 'block';
-        filtered.forEach(m => {
-            const div = document.createElement('div');
-            div.className = 'result-item';
-            div.innerHTML = `<strong>${m.customerName}</strong> <span style="font-size:10px; color:#999;">(${m.customerType === 'existing' ? '기존' : '영업'})</span>`;
-            div.onclick = () => {
-                map.panTo(m.getPosition());
-                map.setLevel(3);
-                infoWindows.forEach(w => w.close());
-                m.infoWindow.open(map, m);
-                infoWindows.push(m.infoWindow);
-                results.style.display = 'none';
-                document.getElementById('search-input').value = m.customerName;
-            };
-            results.appendChild(div);
-        });
-    } else {
-        results.style.display = 'none';
-    }
-}
-
-function toggleFilter(type) {
-    infoWindows.forEach(w => w.close());
-    filterStatus[type] = !filterStatus[type];
-    document.getElementById('btn-' + type).classList.toggle('active', filterStatus[type]);
-    allMarkers.forEach(m => { if (m.customerType === type) m.setMap(filterStatus[type] ? map : null); });
-}
+function toggleRoadviewMode() { rvMode = !rvMode; document.getElementById('rv-toggle-btn').classList.toggle('active', rvMode); map.setCursor(rvMode ? 'crosshair' : 'default'); }
+function closeRoadview() { document.getElementById('rv-container').style.display = 'none'; }
+function moveToCurrentLocation() { if (navigator.geolocation) { navigator.geolocation.getCurrentPosition((pos) => { userLatLng = new kakao.maps.LatLng(pos.coords.latitude, pos.coords.longitude); map.panTo(userLatLng); updateUserMarker(); refreshDataVisibility(); }); } }
+function updateUserMarker() { if (userMarker) userMarker.setMap(null); userMarker = new kakao.maps.CustomOverlay({ position: userLatLng, content: '<div class="user-dot"></div>' }); userMarker.setMap(map); }
+function toggleFilter(type) { filterStatus[type] = !filterStatus[type]; document.getElementById('btn-' + type).classList.toggle('active', filterStatus[type]); refreshDataVisibility(); }
 </script>
 </body>
 </html>
