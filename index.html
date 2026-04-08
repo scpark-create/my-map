@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>RECO Manager - Full Recovery</title>
+    <title>RECO Manager - Compass Mode</title>
     <style>
         :root { --primary-red: #ff4757; --primary-blue: #007bff; --kakao-yellow: #FFEB00; --lead-green: #2ecc71; }
         body, html { margin: 0; padding: 0; height: 100%; font-family: -apple-system, sans-serif; overflow: hidden; background: #f8f9fa; }
@@ -37,22 +37,26 @@
         .nav-btn.active#btn-existing { color: var(--primary-red); }
         .nav-btn.active#btn-new { color: var(--primary-blue); }
 
-        /* GPS 포인터 */
-        .user-marker-container { position: relative; width: 20px; height: 20px; }
-        .user-dot { width: 14px; height: 14px; background: #007bff; border: 2.5px solid white; border-radius: 50%; position: absolute; z-index: 2; top: 3px; left: 3px; }
-        .user-pulse { position: absolute; width: 40px; height: 40px; background: rgba(0,123,255,0.25); border-radius: 50%; top: -10px; left: -10px; animation: pulse 2s infinite; z-index: 1; }
-        .user-arrow { position: absolute; width: 0; height: 0; border-left: 5px solid transparent; border-right: 5px solid transparent; border-bottom: 8px solid #007bff; top: -10px; left: 5px; z-index: 3; }
+        /* GPS 포인터 & 나침반 시야 */
+        .user-marker-container { position: relative; width: 40px; height: 40px; transform: translate(-20px, -20px); }
+        .user-dot { width: 14px; height: 14px; background: #007bff; border: 2.5px solid white; border-radius: 50%; position: absolute; z-index: 10; top: 13px; left: 13px; box-shadow: 0 0 5px rgba(0,0,0,0.3); }
+        .user-pulse { position: absolute; width: 40px; height: 40px; background: rgba(0,123,255,0.2); border-radius: 50%; top: 0; left: 0; animation: pulse 2s infinite; z-index: 5; }
+        
+        /* 부채꼴 시야 표시 (이미지 참고 구현) */
+        .user-view-cone {
+            position: absolute; top: -80px; left: -80px; width: 200px; height: 200px;
+            background: conic-gradient(from -30deg at 50% 50%, rgba(0, 123, 255, 0.3) 0deg, rgba(0, 123, 255, 0) 60deg, transparent 60deg);
+            clip-path: polygon(50% 50%, 20% 0%, 80% 0%);
+            z-index: 1; display: none;
+        }
+
         @keyframes pulse { 0% { transform: scale(0.6); opacity: 1; } 100% { transform: scale(1.6); opacity: 0; } }
 
-        /* 마커 라벨 */
-        .marker-label { position: absolute; bottom: 35px; left: 50%; transform: translateX(-50%); background: white; border: 1.5px solid #333; padding: 4px 10px; border-radius: 8px; font-size: 12px; font-weight: bold; white-space: nowrap; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 10; pointer-events: none; }
-
+        /* 컨트롤 버튼 */
         .side-btns { position: absolute; top: 20px; right: 15px; z-index: 20; display: flex; flex-direction: column; gap: 8px; }
-        .side-btn { width: 45px; height: 45px; border-radius: 50%; border: none; background: white; box-shadow: 0 4px 10px rgba(0,0,0,0.1); cursor: pointer; font-size: 18px; }
-        .side-btn.active { background: var(--primary-blue); color: white; }
-
-        /* 로드뷰 컨테이너 */
-        #rv-container { position: absolute; top: 0; left: 0; width: 100%; height: 50%; z-index: 3000; display: none; background: black; }
+        .side-btn { width: 45px; height: 45px; border-radius: 50%; border: none; background: white; box-shadow: 0 4px 10px rgba(0,0,0,0.1); cursor: pointer; font-size: 18px; display: flex; align-items: center; justify-content: center; transition: 0.2s; }
+        .side-btn.tracking { color: var(--primary-blue); }
+        .side-btn.compass { background: var(--primary-blue); color: white; }
 
         .sheet-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 15px; border-top: 1px solid #eee; padding-top: 15px; }
         .info-item { font-size: 12px; color: #666; }
@@ -75,10 +79,10 @@
     <div class="side-btns">
         <button class="side-btn" onclick="location.reload()">🔑</button>
         <button id="rv-toggle-btn" class="side-btn" onclick="toggleRoadviewMode()">📷</button>
-        <button class="side-btn" onclick="moveToCurrentLocation()">📍</button>
+        <button id="loc-btn" class="side-btn" onclick="toggleLocationMode()">📍</button>
     </div>
 
-    <div id="rv-container">
+    <div id="rv-container" style="position: absolute; top: 0; left: 0; width: 100%; height: 50%; z-index: 3000; display: none;">
         <button style="position:absolute; top:10px; right:10px; z-index:3001;" onclick="closeRoadview()">닫기</button>
         <div id="roadview" style="width:100%;height:100%;"></div>
     </div>
@@ -99,6 +103,7 @@
 <script type="text/javascript" src="//dapi.kakao.com/v2/maps/sdk.js?appkey=674d9cff0f9b5e8d49e24339fdc1c033&libraries=services,clusterer"></script>
 
 <script>
+// API 연동 정보는 기존과 동일
 const loginCsvUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTMzDZTY1xtxilWxjwwUhjXnIFis1P7BxLP8j6csZKBOdmg66V4vlPoTSo66hXvokDY87bGvVPY9vBm/pub?gid=1603902648&single=true&output=csv';
 const existingCsvUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTMzDZTY1xtxilWxjwwUhjXnIFis1P7BxLP8j6csZKBOdmg66V4vlPoTSo66hXvokDY87bGvVPY9vBm/pub?gid=0&single=true&output=csv';
 const salesCsvUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTMzDZTY1xtxilWxjwwUhjXnIFis1P7BxLP8j6csZKBOdmg66V4vlPoTSo66hXvokDY87bGvVPY9vBm/pub?gid=676390554&single=true&output=csv';
@@ -107,6 +112,7 @@ let map, clustererExist, clustererSales, userLatLng = null, userMarker = null, r
 let allRawData = [], filterStatus = { existing: true, new: true };
 let currentUserId = "", userRole = "saler", userLimitRange = 1000, userLimitArea = "";
 let selectedMarker = null, selectedType = null, labelOverlay = null, rvMode = false;
+let locationMode = 0; // 0: 기본, 1: 중심추적, 2: 방향추적
 
 const redDot = 'data:image/svg+xml;base64,' + btoa('<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><circle cx="5" cy="5" r="4" fill="#ff4757" stroke="white" stroke-width="2"/></svg>');
 const blueStar = 'data:image/svg+xml;base64,' + btoa('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"><path fill="#007bff" stroke="white" stroke-width="1.5" d="M12 .587l3.668 7.568 8.332 1.151-6.064 5.828 1.48 8.279-7.416-3.967-7.417 3.967 1.481-8.279-6.064-5.828 8.332-1.151z"/></svg>');
@@ -160,9 +166,91 @@ function initApp() {
     });
 
     loadData();
+    // 시작 시 위치 잡기
+    toggleLocationMode(); 
+}
+
+// [핵심] 위치 및 방향 모드 전환 함수
+function toggleLocationMode() {
+    const btn = document.getElementById('loc-btn');
+    locationMode = (locationMode + 1) % 3;
+
+    if (locationMode === 0) {
+        btn.innerText = "📍";
+        btn.className = "side-btn";
+        stopCompass();
+    } else if (locationMode === 1) {
+        btn.innerText = "🎯";
+        btn.className = "side-btn tracking";
+        moveToCurrentLocation();
+    } else if (locationMode === 2) {
+        btn.innerText = "🧭";
+        btn.className = "side-btn compass";
+        startCompass();
+    }
+}
+
+function startCompass() {
+    if (window.DeviceOrientationEvent) {
+        // iOS 권한 요청 처리
+        if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+            DeviceOrientationEvent.requestPermission()
+                .then(state => { if (state === 'granted') addCompassEvent(); })
+                .catch(console.error);
+        } else {
+            addCompassEvent();
+        }
+    } else {
+        alert("방향 센서를 지원하지 않는 기기입니다.");
+    }
+}
+
+function addCompassEvent() {
+    window.addEventListener('deviceorientation', handleOrientation, true);
     moveToCurrentLocation();
 }
 
+function stopCompass() {
+    window.removeEventListener('deviceorientation', handleOrientation, true);
+    const view = document.getElementById('user-view');
+    if (view) view.style.display = 'none';
+}
+
+function handleOrientation(event) {
+    const view = document.getElementById('user-view');
+    if (!view || locationMode !== 2) return;
+    
+    view.style.display = 'block';
+    let heading = event.webkitCompassHeading || (360 - event.alpha);
+    if (heading) {
+        view.style.transform = `rotate(${heading}deg)`;
+    }
+}
+
+function moveToCurrentLocation() {
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition((pos) => {
+            userLatLng = new kakao.maps.LatLng(pos.coords.latitude, pos.coords.longitude);
+            if (locationMode !== 0) map.panTo(userLatLng);
+            updateUserMarker();
+            refreshDataVisibility();
+        }, () => {}, { enableHighAccuracy: true });
+    }
+}
+
+function updateUserMarker() {
+    if (userMarker) userMarker.setMap(null);
+    const content = `
+        <div class="user-marker-container">
+            <div id="user-view" class="user-view-cone"></div>
+            <div class="user-pulse"></div>
+            <div class="user-dot"></div>
+        </div>`;
+    userMarker = new kakao.maps.CustomOverlay({ position: userLatLng, content: content, zIndex: 10 });
+    userMarker.setMap(map);
+}
+
+// 나머지 로드뷰 및 필터 함수는 기존과 동일
 async function loadData() {
     const [resExist, resSales] = await Promise.all([ fetch(existingCsvUrl + '&t=' + Date.now()), fetch(salesCsvUrl + '&t=' + Date.now()) ]);
     const txtExist = await resExist.text(), txtSales = await resSales.text();
@@ -180,8 +268,7 @@ async function loadData() {
 
 function refreshDataVisibility() {
     if (clustererExist) { clustererExist.clear(); clustererSales.clear(); }
-    allRawData.forEach(d => { if(d.m) d.m.setMap(null); }); // 기존 마커 제거
-
+    allRawData.forEach(d => { if(d.m) d.m.setMap(null); });
     const isMaster = (userRole === 'master');
     const markersExist = [], markersSales = [];
 
@@ -190,27 +277,23 @@ function refreshDataVisibility() {
         const pos = new kakao.maps.LatLng(d.lat, d.lng);
         const idMatch = (d.type === 'existing' || isMaster || (d.ownerId === currentUserId));
         let locMatch = isMaster;
-        
         if (!isMaster && userLatLng) {
             const line = new kakao.maps.Polyline({ path: [userLatLng, pos] });
             if (line.getLength() <= userLimitRange || d.addr.includes(userLimitArea)) locMatch = true;
         }
-
         if (locMatch && idMatch) {
             const marker = new kakao.maps.Marker({ 
                 position: pos, 
                 image: new kakao.maps.MarkerImage(d.type === 'existing' ? redDot : blueStar, d.type === 'existing' ? new kakao.maps.Size(10, 10) : new kakao.maps.Size(14, 14)) 
             });
             d.m = marker;
-            
             kakao.maps.event.addListener(marker, 'click', function() {
                 if (rvMode) return;
-                kakao.maps.event.preventMap(); // 지도 클릭 이벤트 전파 방지
+                kakao.maps.event.preventMap();
                 highlightMarker(marker, d); 
                 showSheet(d); 
                 map.panTo(pos); 
             });
-
             if (isMaster) {
                 if (d.type === 'existing') markersExist.push(marker); else markersSales.push(marker);
             } else {
@@ -252,24 +335,6 @@ function showSheet(data) {
 }
 
 function closeSheet() { document.getElementById('bottom-sheet').classList.remove('active'); }
-
-function moveToCurrentLocation() {
-    if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition((pos) => {
-            userLatLng = new kakao.maps.LatLng(pos.coords.latitude, pos.coords.longitude);
-            map.panTo(userLatLng);
-            updateUserMarker();
-            refreshDataVisibility();
-        }, () => {}, { enableHighAccuracy: true });
-    }
-}
-
-function updateUserMarker() {
-    if (userMarker) userMarker.setMap(null);
-    userMarker = new kakao.maps.CustomOverlay({ position: userLatLng, content: `<div class="user-marker-container"><div class="user-pulse"></div><div class="user-arrow"></div><div class="user-dot"></div></div>`, zIndex: 10 });
-    userMarker.setMap(map);
-}
-
 function toggleRoadviewMode() { 
     rvMode = !rvMode; 
     const btn = document.getElementById('rv-toggle-btn');
@@ -278,7 +343,6 @@ function toggleRoadviewMode() {
     else { map.removeOverlayMapTypeId(kakao.maps.MapTypeId.ROADVIEW); closeRoadview(); }
 }
 function closeRoadview() { document.getElementById('rv-container').style.display = 'none'; }
-
 function toggleFilter(type) {
     filterStatus[type] = !filterStatus[type];
     document.getElementById('btn-' + type).classList.toggle('active', filterStatus[type]);
