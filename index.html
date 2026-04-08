@@ -3,47 +3,38 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>RECO Manager - 지역 필터 최적화</title>
+    <title>RECO Manager - 권한 강화 버전</title>
     <style>
-        :root { --primary-red: #ff4757; --primary-blue: #007bff; --kakao-yellow: #FFEB00; --lead-green: #2ecc71; }
+        :root { --primary-red: #ff4757; --primary-blue: #007bff; --kakao-yellow: #FFEB00; --lead-green: #2ecc71; --dark-grey: #333; }
         body, html { margin: 0; padding: 0; height: 100%; font-family: -apple-system, sans-serif; overflow: hidden; background: #f8f9fa; }
         
-        /* 로그인 UI */
+        /* UI 디자인 (기존 스타일 유지) */
         #login-container { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; padding: 20px; box-sizing: border-box; }
         .login-box { width: 100%; max-width: 340px; padding: 30px; background: white; border-radius: 24px; box-shadow: 0 15px 35px rgba(0,0,0,0.1); text-align: center; }
         .login-box input { width: 100%; padding: 15px; margin: 10px 0; border: 1px solid #eee; border-radius: 12px; font-size: 16px; width: 100%; box-sizing: border-box; outline: none; }
         .login-box button { width: 100%; padding: 16px; background: #4285f4; color: white; border: none; border-radius: 12px; font-size: 18px; font-weight: bold; cursor: pointer; }
-
         #main-content { display: none; position: relative; width: 100%; height: 100%; }
         #map { width: 100%; height: 100%; }
-
-        /* 버튼 그룹 */
-        .side-btns { position: absolute; top: 20px; right: 20px; z-index: 20; display: flex; flex-direction: column; gap: 10px; }
-        .side-btn { padding: 10px 18px; border-radius: 25px; border: none; font-weight: bold; font-size: 12px; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
-        .logout-pill { background: var(--primary-red); color: white; }
-        .rv-btn { background: #333; color: white; }
-
-        /* 하단 필터 바 */
-        .bottom-nav { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); z-index: 10; display: flex; gap: 5px; background: rgba(255,255,255,0.9); padding: 12px 15px; border-radius: 50px; box-shadow: 0 8px 32px rgba(0,0,0,0.15); backdrop-filter: blur(10px); width: 92%; max-width: 450px; justify-content: space-around; }
-        .nav-btn { border: none; background: none; font-size: 11px; font-weight: bold; display: flex; flex-direction: column; align-items: center; color: #999; cursor: pointer; }
-        #btn-existing.active { color: var(--primary-red) !important; }
-        #btn-new.active { color: var(--primary-blue) !important; }
-
-        /* 마커 스타일 */
-        .mini-dot { width: 8px; height: 8px; border: 1.5px solid #fff; border-radius: 50%; cursor: pointer; box-shadow: 0 0 3px rgba(0,0,0,0.4); }
-        .mini-dot.existing { background: var(--primary-red); }
-        .star-marker { color: var(--primary-blue); font-size: 20px; text-shadow: 0 0 3px #fff; cursor: pointer; transform: translate(-2px, -8px); font-weight: bold; }
-
-        /* 무지개 위치 마커 */
-        @keyframes rainbow { 0% { background: #ff0000; } 20% { background: #ffcc00; } 40% { background: #00ff00; } 60% { background: #00ffff; } 80% { background: #0000ff; } 100% { background: #ff00ff; } }
-        .user-dot { width: 14px; height: 14px; border: 3px solid white; border-radius: 50%; animation: rainbow 2s infinite linear; box-shadow: 0 0 10px rgba(0,0,0,0.5); }
-
-        .info-content { padding: 10px; min-width: 240px; font-size: 13px; }
-        .action-btn { display: block; padding: 10px; margin-top: 5px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 12px; text-align: center; }
-        .navi-btn { background: var(--kakao-yellow); color: #3C1E1E; }
-        .lead-btn { background: var(--lead-green); color: white; }
-
-        #rv-container { position: absolute; top: 10%; left: 5%; width: 90%; height: 70%; z-index: 100; display: none; background: white; border-radius: 15px; overflow: hidden; box-shadow: 0 10px 40px rgba(0,0,0,0.4); }
+        .side-btns { position: absolute; top: 20px; right: 15px; z-index: 20; display: flex; flex-direction: column; gap: 8px; }
+        .side-btn { width: 45px; height: 45px; border-radius: 50%; border: none; background: white; box-shadow: 0 4px 10px rgba(0,0,0,0.1); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 18px; }
+        #bottom-sheet { position: absolute; bottom: -100%; left: 0; width: 100%; background: white; z-index: 1000; border-radius: 24px 24px 0 0; box-shadow: 0 -5px 25px rgba(0,0,0,0.1); transition: bottom 0.3s ease-out; padding: 20px; box-sizing: border-box; max-height: 80vh; overflow-y: auto; }
+        #bottom-sheet.active { bottom: 0; }
+        .sheet-handle { width: 40px; height: 5px; background: #ddd; border-radius: 10px; margin: -10px auto 15px; }
+        .sheet-title { font-size: 20px; font-weight: bold; margin-bottom: 5px; color: var(--dark-grey); }
+        .sheet-addr { font-size: 13px; color: #888; margin-bottom: 15px; }
+        .sheet-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; border-top: 1px solid #f0f0f0; padding-top: 15px; }
+        .info-item { font-size: 12px; color: #555; }
+        .info-item b { color: #222; display: block; font-size: 14px; margin-top: 2px; }
+        .sheet-actions { display: flex; gap: 10px; margin-top: 20px; }
+        .action-btn { flex: 1; padding: 14px; border-radius: 12px; text-align: center; text-decoration: none; font-weight: bold; font-size: 14px; }
+        .btn-navi { background: var(--kakao-yellow); color: #3C1E1E; }
+        .btn-form { background: var(--lead-green); color: white; }
+        .bottom-nav { position: absolute; bottom: 25px; left: 50%; transform: translateX(-50%); z-index: 10; display: flex; gap: 10px; background: rgba(255,255,255,0.9); padding: 10px 20px; border-radius: 50px; box-shadow: 0 8px 32px rgba(0,0,0,0.1); backdrop-filter: blur(10px); width: 85%; max-width: 400px; justify-content: space-between; }
+        .nav-btn { border: none; background: none; font-size: 11px; font-weight: bold; color: #aaa; cursor: pointer; }
+        .nav-btn.active#btn-existing { color: var(--primary-red); }
+        .nav-btn.active#btn-new { color: var(--primary-blue); }
+        .user-dot { width: 14px; height: 14px; border: 3px solid white; border-radius: 50%; animation: rainbow 2s infinite linear; box-shadow: 0 0 10px rgba(0,0,0,0.5); position: absolute; }
+        @keyframes rainbow { 0% { background: #ff0000; } 100% { background: #ff00ff; } }
     </style>
 </head>
 <body>
@@ -60,47 +51,55 @@
 
 <div id="main-content">
     <div class="side-btns">
-        <button class="side-btn logout-pill" onclick="location.reload()">로그아웃</button>
-        <button id="rv-toggle-btn" class="side-btn rv-btn" onclick="toggleRoadviewMode()">📷 로드뷰 모드</button>
+        <button class="side-btn" onclick="location.reload()">🔑</button>
+        <button id="rv-toggle-btn" class="side-btn" onclick="toggleRoadviewMode()">📷</button>
+        <button class="side-btn" onclick="moveToCurrentLocation()">📍</button>
     </div>
 
-    <div id="rv-container">
-        <button style="position:absolute; top:10px; right:10px; z-index:101;" onclick="closeRoadview()">닫기</button>
+    <div id="bottom-sheet">
+        <div class="sheet-handle" onclick="closeSheet()"></div>
+        <div id="sheet-content"></div>
+    </div>
+
+    <div id="rv-container" style="position: absolute; top: 0; left: 0; width: 100%; height: 50%; z-index: 1001; display: none;">
+        <button style="position:absolute; top:10px; right:10px; z-index:1002;" onclick="closeRoadview()">닫기</button>
         <div id="roadview" style="width:100%;height:100%;"></div>
     </div>
 
     <div class="bottom-nav">
-        <button class="nav-btn" style="color: #34a853;" onclick="moveToCurrentLocation()">📍<span>나의 위치</span></button>
-        <button id="btn-existing" class="nav-btn active" onclick="toggleFilter('existing')">●<span>기존고객</span></button>
-        <button id="btn-new" class="nav-btn active" onclick="toggleFilter('new')">★<span>나의영업</span></button>
+        <button id="btn-existing" class="nav-btn active" onclick="toggleFilter('existing')">● 기존고객</button>
+        <button id="btn-new" class="nav-btn active" onclick="toggleFilter('new')">★ 나의영업</button>
     </div>
     <div id="map"></div>
 </div>
 
-<script type="text/javascript" src="//dapi.kakao.com/v2/maps/sdk.js?appkey=674d9cff0f9b5e8d49e24339fdc1c033&libraries=services"></script>
+<script type="text/javascript" src="//dapi.kakao.com/v2/maps/sdk.js?appkey=674d9cff0f9b5e8d49e24339fdc1c033&libraries=services,clusterer"></script>
 
 <script>
 const loginCsvUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTMzDZTY1xtxilWxjwwUhjXnIFis1P7BxLP8j6csZKBOdmg66V4vlPoTSo66hXvokDY87bGvVPY9vBm/pub?gid=1603902648&single=true&output=csv';
 const existingCsvUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTMzDZTY1xtxilWxjwwUhjXnIFis1P7BxLP8j6csZKBOdmg66V4vlPoTSo66hXvokDY87bGvVPY9vBm/pub?gid=0&single=true&output=csv';
 const salesCsvUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTMzDZTY1xtxilWxjwwUhjXnIFis1P7BxLP8j6csZKBOdmg66V4vlPoTSo66hXvokDY87bGvVPY9vBm/pub?gid=676390554&single=true&output=csv';
 
-let map, rv, rvClient, userLatLng = null, allMarkers = [], filterStatus = { existing: true, new: true };
+let map, clusterer, rv, rvClient, userLatLng = null;
+let allRawData = [], filterStatus = { existing: true, new: true };
 let currentUserId = "", userRole = "saler", userLimitRange = 1000, userLimitArea = "", userMarker = null, rvMode = false;
+let currentMarkers = [];
 
-function cleanCoord(val) {
-    if (!val) return null;
-    let cleaned = val.toString().replace(/[^0-9.]/g, '');
-    return cleaned ? parseFloat(cleaned) : null;
-}
+// 마커 이미지 (별 크기를 14px로 더 축소)
+const redDotSvg = 'data:image/svg+xml;base64,' + btoa('<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 10 10"><circle cx="5" cy="5" r="4" fill="#ff4757" stroke="white" stroke-width="2"/></svg>');
+const blueStarSvg = 'data:image/svg+xml;base64,' + btoa('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"><path fill="#007bff" stroke="white" stroke-width="1.5" d="M12 .587l3.668 7.568 8.332 1.151-6.064 5.828 1.48 8.279-7.416-3.967-7.417 3.967 1.481-8.279-6.064-5.828 8.332-1.151z"/></svg>');
 
-// 지역 매칭 최적화 함수 (공백 제거 및 부분 일치 검사 강화)
+const imgExisting = new kakao.maps.MarkerImage(redDotSvg, new kakao.maps.Size(10, 10), { offset: new kakao.maps.Point(5, 5) });
+const imgSales = new kakao.maps.MarkerImage(blueStarSvg, new kakao.maps.Size(14, 14), { offset: new kakao.maps.Point(7, 7) });
+
+function cleanCoord(val) { return val ? parseFloat(val.toString().replace(/[^0-9.]/g, '')) : null; }
+
+// 지역 매칭 로직 개선
 function isAreaMatch(addr, limitArea) {
     if (!limitArea || limitArea === "" || limitArea === "전체") return true;
     const cleanAddr = addr.replace(/\s/g, '');
     const cleanLimit = limitArea.replace(/\s/g, '');
-    // 예: '경기도안양시'가 '경기안양시...'에 포함되거나 그 반대인 경우 체크
-    const shortLimit = cleanLimit.replace(/경기도/g, '경기').replace(/서울특별시/g, '서울').replace(/인천광역시/g, '인천');
-    return cleanAddr.includes(cleanLimit) || cleanAddr.includes(shortLimit);
+    return cleanAddr.includes(cleanLimit);
 }
 
 async function checkLogin() {
@@ -129,107 +128,133 @@ function initApp() {
     document.getElementById('login-container').style.display = 'none';
     document.getElementById('main-content').style.display = 'block';
     map = new kakao.maps.Map(document.getElementById('map'), { center: new kakao.maps.LatLng(37.5668, 126.9786), level: 4 });
+
+    if (userRole === 'master') {
+        clusterer = new kakao.maps.MarkerClusterer({ map: map, averageCenter: true, minLevel: 7 });
+    }
     rvClient = new kakao.maps.RoadviewClient();
     rv = new kakao.maps.Roadview(document.getElementById('roadview'));
-    kakao.maps.event.addListener(map, 'click', function(e) {
-        if (rvMode) {
-            rvClient.getNearestPanoId(e.latLng, 50, function(id) {
-                if (id) { document.getElementById('rv-container').style.display = 'block'; rv.setPanoId(id, e.latLng); }
-                else { alert("로드뷰 불가 지역입니다."); }
-            });
-        }
-    });
     loadData();
-}
-
-function requestPosition() {
-    if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition((pos) => {
-            userLatLng = new kakao.maps.LatLng(pos.coords.latitude, pos.coords.longitude);
-            map.panTo(userLatLng);
-            updateUserMarker();
-            refreshDataVisibility();
-        });
-    }
 }
 
 async function loadData() {
     const [resExist, resSales] = await Promise.all([ fetch(existingCsvUrl + '&t=' + Date.now()), fetch(salesCsvUrl + '&t=' + Date.now()) ]);
     const txtExist = await resExist.text();
-    txtExist.split(/\r?\n/).slice(1).forEach(row => {
-        if(!row.trim()) return;
-        addMarkerToMap(row.split(',').map(v => v.replace(/^"|"$/g, '').trim()), 'existing');
-    });
     const txtSales = await resSales.text();
+    
+    allRawData = [];
+    txtExist.split(/\r?\n/).slice(1).forEach(row => {
+        const c = row.split(',').map(v => v.replace(/^"|"$/g, '').trim());
+        if (c.length < 4) return;
+        allRawData.push({ 
+            type: 'existing', name: c[0], addr: c[1], lat: cleanCoord(c[2]), lng: cleanCoord(c[3]),
+            extra: { contractPrice: c[4], plan: c[5], day: c[6], srvType: c[7], baseVol: c[8], basePrice: c[9], monthlyVol: c[10], avgBins: c[11] }
+        });
+    });
     txtSales.split(/\r?\n/).slice(1).forEach(row => {
-        if(!row.trim()) return;
-        addMarkerToMap(row.split(',').map(v => v.replace(/^"|"$/g, '').trim()), 'new');
+        const c = row.split(',').map(v => v.replace(/^"|"$/g, '').trim());
+        if (c.length < 5) return;
+        allRawData.push({ 
+            type: 'new', ownerId: c[0]?.toLowerCase(), name: c[1], addr: c[2], lat: cleanCoord(c[3]), lng: cleanCoord(c[4]),
+            extra: { category: c[5], area: c[6], estVol: c[7], mealCount: c[8] }
+        });
     });
     refreshDataVisibility();
 }
 
-function addMarkerToMap(c, type) {
-    let name, addr, lat, lng, iwContent, ownerId;
-    if (type === 'existing') {
-        name = c[0]; addr = c[1]; lat = cleanCoord(c[2]); lng = cleanCoord(c[3]);
-        iwContent = `<div class="info-content"><strong>${name}</strong><br><small>${addr}</small><br>
-            <a href="https://map.kakao.com/link/to/${encodeURIComponent(name)},${lat},${lng}" target="_blank" class="action-btn navi-btn">🚕 길찾기</a></div>`;
-    } else {
-        ownerId = c[0] ? c[0].toLowerCase().trim() : "";
-        name = c[1]; addr = c[2]; lat = cleanCoord(c[3]); lng = cleanCoord(c[4]);
-        iwContent = `<div class="info-content"><strong>${name} (영업)</strong><br><small>${addr}</small><br>
-            <a href="https://map.kakao.com/link/to/${encodeURIComponent(name)},${lat},${lng}" target="_blank" class="action-btn navi-btn">🚕 길찾기</a>
-            <a href="https://form.naver.com/" target="_blank" class="action-btn lead-btn">📝 영업리드 등록</a></div>`;
-    }
-    if (!lat || !lng) return;
-    const coords = new kakao.maps.LatLng(lat, lng);
-    const hiddenMarker = new kakao.maps.Marker({ position: coords, image: new kakao.maps.MarkerImage('https://t1.daumcdn.net/localimg/localimages/07/mapjsapi/2.0/point.png', new kakao.maps.Size(1, 1)), opacity: 0 });
-    
-    const overlayContent = document.createElement('div');
-    overlayContent.className = (type === 'existing') ? 'mini-dot existing' : 'star-marker';
-    overlayContent.innerHTML = (type === 'existing') ? '' : '★';
-
-    const overlay = new kakao.maps.CustomOverlay({ position: coords, content: overlayContent, clickable: true });
-    const iw = new kakao.maps.InfoWindow({ content: iwContent, removable: true });
-
-    overlayContent.onclick = () => { if (rvMode) return; map.panTo(coords); allMarkers.forEach(m => m.iw.close()); iw.open(map, hiddenMarker); };
-    allMarkers.push({ customerType: type, overlay, hiddenMarker, iw, pos: coords, addr, ownerId });
-}
-
 function refreshDataVisibility() {
-    allMarkers.forEach(m => {
-        let isVisible = false;
-        const isMaster = (userRole === 'master');
+    if (clusterer) clusterer.clear();
+    currentMarkers.forEach(m => m.setMap(null));
+    currentMarkers = [];
+    const markers = [];
+    const isMaster = (userRole === 'master');
+
+    allRawData.forEach(d => {
+        if (!filterStatus[d.type]) return;
+        if (!d.lat || !d.lng) return;
+
+        const pos = new kakao.maps.LatLng(d.lat, d.lng);
         
-        // 1. 반경 내 존재 여부 확인 (GPS 기반)
-        let rangeMatch = false;
-        if (userLatLng) {
-            const line = new kakao.maps.Polyline({ path: [userLatLng, m.pos] });
-            if (line.getLength() <= userLimitRange) rangeMatch = true;
+        // 권한 필터링 핵심 로직
+        let isAuthorized = false;
+
+        if (isMaster) {
+            isAuthorized = true; // 마스터는 무조건 전체
+        } else {
+            // Saler 필터링
+            const areaMatch = isAreaMatch(d.addr, userLimitArea);
+            let rangeMatch = false;
+            if (userLatLng) {
+                const line = new kakao.maps.Polyline({ path: [userLatLng, pos] });
+                if (line.getLength() <= userLimitRange) rangeMatch = true;
+            }
+
+            // 조건 1: 반경 혹은 지역이 매칭되어야 함
+            const locationMatch = (areaMatch || rangeMatch);
+
+            if (d.type === 'existing') {
+                isAuthorized = locationMatch; // 기존 고객은 위치만 맞으면 노출
+            } else {
+                // 영업 고객은 위치도 맞아야 하고, 담당자 ID도 내 ID와 일치해야 함
+                const idMatch = (d.ownerId === currentUserId);
+                isAuthorized = (locationMatch && idMatch);
+            }
         }
 
-        // 2. 담당 지역 일치 여부 확인 (주소 텍스트 기반)
-        const areaMatch = isAreaMatch(m.addr, userLimitArea);
+        if (isAuthorized) {
+            const marker = new kakao.maps.Marker({
+                position: pos, image: (d.type === 'existing' ? imgExisting : imgSales)
+            });
+            kakao.maps.event.addListener(marker, 'click', () => { showSheet(d); map.panTo(pos); });
 
-        // 3. 데이터 권한 확인 (기존고객은 공용, 영업은 마스터 혹은 본인 데이터만)
-        const isMyData = (m.customerType === 'existing' || isMaster || (m.ownerId === currentUserId));
-
-        // [핵심 로직] 마스터이거나, (내 데이터이면서 (반경 내 혹은 지역 일치)) 하는 경우 노출
-        if (isMaster || (isMyData && (rangeMatch || areaMatch))) {
-            isVisible = filterStatus[m.customerType];
+            if (isMaster) markers.push(marker);
+            else { marker.setMap(map); currentMarkers.push(marker); }
         }
-        
-        m.overlay.setMap(isVisible ? map : null);
-        m.hiddenMarker.setMap(isVisible ? map : null);
-        if (!isVisible) m.iw.close();
     });
+    if (isMaster && clusterer) clusterer.addMarkers(markers);
 }
 
-function toggleRoadviewMode() { rvMode = !rvMode; document.getElementById('rv-toggle-btn').classList.toggle('active', rvMode); map.setCursor(rvMode ? 'crosshair' : 'default'); }
+function showSheet(data) {
+    const sheet = document.getElementById('bottom-sheet');
+    const content = document.getElementById('sheet-content');
+    let html = `<div class="sheet-title">${data.name}</div><div class="sheet-addr">${data.addr}</div><div class="sheet-grid">`;
+    if (data.type === 'existing') {
+        const e = data.extra;
+        html += `<div class="info-item">계약단가<b>${e.contractPrice || '-'}</b></div><div class="info-item">요금제<b>${e.plan || '-'}</b></div><div class="info-item">수거요일<b>${e.day || '-'}</b></div><div class="info-item">서비스유형<b>${e.srvType || '-'}</b></div><div class="info-item">기본수거량<b>${e.baseVol || '-'}</b></div><div class="info-item">기본요금<b>${e.basePrice || '-'}</b></div><div class="info-item">월수거량<b>${e.monthlyVol || '-'}</b></div><div class="info-item">평균용기수<b>${e.avgBins || '-'}</b></div>`;
+    } else {
+        const e = data.extra;
+        html += `<div class="info-item">업종구분<b>${e.category || '-'}</b></div><div class="info-item">면적<b>${e.area || '-'}</b></div><div class="info-item">예상배출량<b>${e.estVol || '-'}</b></div><div class="info-item">급식인원<b>${e.mealCount || '-'}</b></div>`;
+    }
+    html += `</div><div class="sheet-actions"><a href="https://map.kakao.com/link/to/${encodeURIComponent(data.name)},${data.lat},${data.lng}" target="_blank" class="action-btn btn-navi">🚕 길찾기</a>${data.type === 'new' ? '<a href="https://form.naver.com/" target="_blank" class="action-btn btn-form">📝 리드 등록</a>' : ''}</div>`;
+    content.innerHTML = html;
+    sheet.classList.add('active');
+}
+
+function closeSheet() { document.getElementById('bottom-sheet').classList.remove('active'); }
+function toggleRoadviewMode() { 
+    rvMode = !rvMode; 
+    if (rvMode) map.addOverlayMapTypeId(kakao.maps.MapTypeId.ROADVIEW);
+    else { map.removeOverlayMapTypeId(kakao.maps.MapTypeId.ROADVIEW); closeRoadview(); }
+}
 function closeRoadview() { document.getElementById('rv-container').style.display = 'none'; }
-function moveToCurrentLocation() { if (navigator.geolocation) { navigator.geolocation.getCurrentPosition((pos) => { userLatLng = new kakao.maps.LatLng(pos.coords.latitude, pos.coords.longitude); map.panTo(userLatLng); updateUserMarker(); refreshDataVisibility(); }); } }
-function updateUserMarker() { if (userMarker) userMarker.setMap(null); userMarker = new kakao.maps.CustomOverlay({ position: userLatLng, content: '<div class="user-dot"></div>' }); userMarker.setMap(map); }
-function toggleFilter(type) { filterStatus[type] = !filterStatus[type]; document.getElementById('btn-' + type).classList.toggle('active', filterStatus[type]); refreshDataVisibility(); }
+function moveToCurrentLocation() {
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition((pos) => {
+            userLatLng = new kakao.maps.LatLng(pos.coords.latitude, pos.coords.longitude);
+            map.panTo(userLatLng); updateUserMarker(); refreshDataVisibility();
+        });
+    }
+}
+function updateUserMarker() {
+    if (userMarker) userMarker.setMap(null);
+    userMarker = new kakao.maps.CustomOverlay({ position: userLatLng, content: '<div class="user-dot"></div>' });
+    userMarker.setMap(map);
+}
+function toggleFilter(type) {
+    filterStatus[type] = !filterStatus[type];
+    document.getElementById('btn-' + type).classList.toggle('active', filterStatus[type]);
+    refreshDataVisibility();
+}
 </script>
 </body>
 </html>
