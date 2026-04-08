@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>RECO Manager - Compass Mode</title>
+    <title>RECO Manager - UI Optimized</title>
     <style>
         :root { --primary-red: #ff4757; --primary-blue: #007bff; --kakao-yellow: #FFEB00; --lead-green: #2ecc71; }
         body, html { margin: 0; padding: 0; height: 100%; font-family: -apple-system, sans-serif; overflow: hidden; background: #f8f9fa; }
@@ -37,25 +37,45 @@
         .nav-btn.active#btn-existing { color: var(--primary-red); }
         .nav-btn.active#btn-new { color: var(--primary-blue); }
 
-        /* GPS 포인터 & 나침반 시야 */
+        /* 클릭 시 업장명 라벨 디자인 (이미지 참고 수정) */
+        .marker-label {
+            background: white;
+            color: black;
+            padding: 4px 12px;
+            border-radius: 12px;
+            border: 1px solid #333;
+            font-size: 13px;
+            font-weight: bold;
+            white-space: nowrap;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+            position: relative;
+        }
+        /* 말풍선 꼬리 */
+        .marker-label::after {
+            content: '';
+            position: absolute;
+            bottom: -6px;
+            left: 50%;
+            transform: translateX(-50%);
+            border-width: 6px 6px 0;
+            border-style: solid;
+            border-color: #333 transparent transparent;
+        }
+
+        /* GPS 포인터 & 나침반 */
         .user-marker-container { position: relative; width: 40px; height: 40px; transform: translate(-20px, -20px); }
         .user-dot { width: 14px; height: 14px; background: #007bff; border: 2.5px solid white; border-radius: 50%; position: absolute; z-index: 10; top: 13px; left: 13px; box-shadow: 0 0 5px rgba(0,0,0,0.3); }
         .user-pulse { position: absolute; width: 40px; height: 40px; background: rgba(0,123,255,0.2); border-radius: 50%; top: 0; left: 0; animation: pulse 2s infinite; z-index: 5; }
-        
-        /* 부채꼴 시야 표시 (이미지 참고 구현) */
         .user-view-cone {
             position: absolute; top: -80px; left: -80px; width: 200px; height: 200px;
             background: conic-gradient(from -30deg at 50% 50%, rgba(0, 123, 255, 0.3) 0deg, rgba(0, 123, 255, 0) 60deg, transparent 60deg);
             clip-path: polygon(50% 50%, 20% 0%, 80% 0%);
             z-index: 1; display: none;
         }
-
         @keyframes pulse { 0% { transform: scale(0.6); opacity: 1; } 100% { transform: scale(1.6); opacity: 0; } }
 
-        /* 컨트롤 버튼 */
         .side-btns { position: absolute; top: 20px; right: 15px; z-index: 20; display: flex; flex-direction: column; gap: 8px; }
         .side-btn { width: 45px; height: 45px; border-radius: 50%; border: none; background: white; box-shadow: 0 4px 10px rgba(0,0,0,0.1); cursor: pointer; font-size: 18px; display: flex; align-items: center; justify-content: center; transition: 0.2s; }
-        .side-btn.tracking { color: var(--primary-blue); }
         .side-btn.compass { background: var(--primary-blue); color: white; }
 
         .sheet-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 15px; border-top: 1px solid #eee; padding-top: 15px; }
@@ -103,7 +123,6 @@
 <script type="text/javascript" src="//dapi.kakao.com/v2/maps/sdk.js?appkey=674d9cff0f9b5e8d49e24339fdc1c033&libraries=services,clusterer"></script>
 
 <script>
-// API 연동 정보는 기존과 동일
 const loginCsvUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTMzDZTY1xtxilWxjwwUhjXnIFis1P7BxLP8j6csZKBOdmg66V4vlPoTSo66hXvokDY87bGvVPY9vBm/pub?gid=1603902648&single=true&output=csv';
 const existingCsvUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTMzDZTY1xtxilWxjwwUhjXnIFis1P7BxLP8j6csZKBOdmg66V4vlPoTSo66hXvokDY87bGvVPY9vBm/pub?gid=0&single=true&output=csv';
 const salesCsvUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTMzDZTY1xtxilWxjwwUhjXnIFis1P7BxLP8j6csZKBOdmg66V4vlPoTSo66hXvokDY87bGvVPY9vBm/pub?gid=676390554&single=true&output=csv';
@@ -112,7 +131,7 @@ let map, clustererExist, clustererSales, userLatLng = null, userMarker = null, r
 let allRawData = [], filterStatus = { existing: true, new: true };
 let currentUserId = "", userRole = "saler", userLimitRange = 1000, userLimitArea = "";
 let selectedMarker = null, selectedType = null, labelOverlay = null, rvMode = false;
-let locationMode = 0; // 0: 기본, 1: 중심추적, 2: 방향추적
+let locationMode = 1; // 1: 기본이동, 2: 방향추적 (과녁 모드 제거)
 
 const redDot = 'data:image/svg+xml;base64,' + btoa('<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><circle cx="5" cy="5" r="4" fill="#ff4757" stroke="white" stroke-width="2"/></svg>');
 const blueStar = 'data:image/svg+xml;base64,' + btoa('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"><path fill="#007bff" stroke="white" stroke-width="1.5" d="M12 .587l3.668 7.568 8.332 1.151-6.064 5.828 1.48 8.279-7.416-3.967-7.417 3.967 1.481-8.279-6.064-5.828 8.332-1.151z"/></svg>');
@@ -166,48 +185,54 @@ function initApp() {
     });
 
     loadData();
-    // 시작 시 위치 잡기
-    toggleLocationMode(); 
+    startLocationTracking();
 }
 
-// [핵심] 위치 및 방향 모드 전환 함수
 function toggleLocationMode() {
     const btn = document.getElementById('loc-btn');
-    locationMode = (locationMode + 1) % 3;
-
-    if (locationMode === 0) {
-        btn.innerText = "📍";
-        btn.className = "side-btn";
-        stopCompass();
-    } else if (locationMode === 1) {
-        btn.innerText = "🎯";
-        btn.className = "side-btn tracking";
-        moveToCurrentLocation();
-    } else if (locationMode === 2) {
+    if (locationMode === 1) {
+        // 방향 모드로 전환
+        locationMode = 2;
         btn.innerText = "🧭";
         btn.className = "side-btn compass";
         startCompass();
+    } else {
+        // 이동 모드로 전환
+        locationMode = 1;
+        btn.innerText = "📍";
+        btn.className = "side-btn";
+        stopCompass();
+        moveToCurrentLocation();
     }
+}
+
+function startLocationTracking() {
+    if (navigator.geolocation) {
+        navigator.geolocation.watchPosition((pos) => {
+            userLatLng = new kakao.maps.LatLng(pos.coords.latitude, pos.coords.longitude);
+            if (locationMode !== 0 && !selectedMarker) {
+                // 특정 마커 선택중이 아닐 때만 추적
+                // map.panTo(userLatLng); // 자동 중심 이동이 불편할 경우 주석 처리
+            }
+            updateUserMarker();
+        }, null, { enableHighAccuracy: true });
+    }
+}
+
+function moveToCurrentLocation() {
+    if (userLatLng) map.panTo(userLatLng);
 }
 
 function startCompass() {
     if (window.DeviceOrientationEvent) {
-        // iOS 권한 요청 처리
         if (typeof DeviceOrientationEvent.requestPermission === 'function') {
             DeviceOrientationEvent.requestPermission()
-                .then(state => { if (state === 'granted') addCompassEvent(); })
+                .then(state => { if (state === 'granted') window.addEventListener('deviceorientation', handleOrientation, true); })
                 .catch(console.error);
         } else {
-            addCompassEvent();
+            window.addEventListener('deviceorientation', handleOrientation, true);
         }
-    } else {
-        alert("방향 센서를 지원하지 않는 기기입니다.");
     }
-}
-
-function addCompassEvent() {
-    window.addEventListener('deviceorientation', handleOrientation, true);
-    moveToCurrentLocation();
 }
 
 function stopCompass() {
@@ -219,23 +244,9 @@ function stopCompass() {
 function handleOrientation(event) {
     const view = document.getElementById('user-view');
     if (!view || locationMode !== 2) return;
-    
     view.style.display = 'block';
     let heading = event.webkitCompassHeading || (360 - event.alpha);
-    if (heading) {
-        view.style.transform = `rotate(${heading}deg)`;
-    }
-}
-
-function moveToCurrentLocation() {
-    if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition((pos) => {
-            userLatLng = new kakao.maps.LatLng(pos.coords.latitude, pos.coords.longitude);
-            if (locationMode !== 0) map.panTo(userLatLng);
-            updateUserMarker();
-            refreshDataVisibility();
-        }, () => {}, { enableHighAccuracy: true });
-    }
+    if (heading) view.style.transform = `rotate(${heading}deg)`;
 }
 
 function updateUserMarker() {
@@ -250,7 +261,6 @@ function updateUserMarker() {
     userMarker.setMap(map);
 }
 
-// 나머지 로드뷰 및 필터 함수는 기존과 동일
 async function loadData() {
     const [resExist, resSales] = await Promise.all([ fetch(existingCsvUrl + '&t=' + Date.now()), fetch(salesCsvUrl + '&t=' + Date.now()) ]);
     const txtExist = await resExist.text(), txtSales = await resSales.text();
@@ -289,7 +299,6 @@ function refreshDataVisibility() {
             d.m = marker;
             kakao.maps.event.addListener(marker, 'click', function() {
                 if (rvMode) return;
-                kakao.maps.event.preventMap();
                 highlightMarker(marker, d); 
                 showSheet(d); 
                 map.panTo(pos); 
@@ -308,10 +317,16 @@ function highlightMarker(marker, data) {
     resetSelectedMarker();
     selectedMarker = marker;
     selectedType = data.type;
-    const size = data.type === 'existing' ? 20 : 28;
+    const size = data.type === 'existing' ? 22 : 30;
     marker.setImage(new kakao.maps.MarkerImage(data.type === 'existing' ? redDot : blueStar, new kakao.maps.Size(size, size)));
     marker.setZIndex(100);
-    labelOverlay = new kakao.maps.CustomOverlay({ position: marker.getPosition(), content: `<div class="marker-label">${data.name}</div>`, yAnchor: 1.3 });
+    
+    // 업장명 라벨 오버레이 생성 (CSS 적용됨)
+    labelOverlay = new kakao.maps.CustomOverlay({ 
+        position: marker.getPosition(), 
+        content: `<div class="marker-label">${data.name}</div>`, 
+        yAnchor: 2.2 // 마커 위로 충분히 띄움
+    });
     labelOverlay.setMap(map);
 }
 
