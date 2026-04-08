@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>RECO Manager - Full Features</title>
+    <title>RECO Manager - Master Cluster Included</title>
     <style>
         :root { --primary-red: #ff4757; --primary-blue: #007bff; --kakao-yellow: #FFEB00; --lead-green: #2ecc71; }
         body, html { margin: 0; padding: 0; height: 100%; font-family: -apple-system, sans-serif; overflow: hidden; background: #f8f9fa; }
@@ -26,10 +26,10 @@
         #bottom-sheet.active { bottom: 0; }
         .sheet-handle { width: 40px; height: 5px; background: #e0e0e0; border-radius: 10px; margin: -10px auto 15px; cursor: pointer; }
 
+        /* 컨트롤 버튼 */
         .side-btns { position: absolute; top: 20px; right: 15px; z-index: 20; display: flex; flex-direction: column; gap: 8px; }
         .side-btn { width: 45px; height: 45px; border-radius: 50%; border: none; background: white; box-shadow: 0 4px 10px rgba(0,0,0,0.1); cursor: pointer; font-size: 18px; display: flex; align-items: center; justify-content: center; }
         .side-btn.active { background: var(--kakao-yellow); color: #000; }
-        .side-btn.compass-on { background: var(--primary-blue); color: white; }
 
         #rv-container { position: absolute; top: 0; left: 0; width: 100%; height: 50%; z-index: 3000; display: none; border-bottom: 2px solid #000; }
         #rv-close { position: absolute; top: 15px; right: 15px; z-index: 3001; background: rgba(0,0,0,0.6); color: white; border: none; padding: 8px 15px; border-radius: 10px; cursor: pointer; }
@@ -61,6 +61,9 @@
 
         .marker-label { background: white; color: black; padding: 4px 12px; border-radius: 12px; border: 1.5px solid #333; font-size: 13px; font-weight: bold; white-space: nowrap; box-shadow: 0 2px 6px rgba(0,0,0,0.2); }
         .sheet-btn { flex: 1; padding: 15px; text-align: center; border-radius: 12px; text-decoration: none; font-weight: bold; font-size: 14px; }
+        .sheet-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 15px; border-top: 1px solid #eee; padding-top: 15px; }
+        .info-item { font-size: 12px; color: #666; }
+        .info-item b { display: block; color: #222; font-size: 14px; margin-top: 2px; }
     </style>
 </head>
 <body>
@@ -108,7 +111,7 @@ const loginCsvUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTMzDZTY1xt
 const existingCsvUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTMzDZTY1xtxilWxjwwUhjXnIFis1P7BxLP8j6csZKBOdmg66V4vlPoTSo66hXvokDY87bGvVPY9vBm/pub?gid=0&single=true&output=csv';
 const salesCsvUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTMzDZTY1xtxilWxjwwUhjXnIFis1P7BxLP8j6csZKBOdmg66V4vlPoTSo66hXvokDY87bGvVPY9vBm/pub?gid=676390554&single=true&output=csv';
 
-let map, userLatLng = null, userMarkerOverlay = null, rv, rvClient;
+let map, clustererExist = null, clustererSales = null, userLatLng = null, userMarkerOverlay = null, rv, rvClient;
 let allRawData = [], filterStatus = { existing: true, new: true };
 let currentUserId = "", userRole = "saler", userLimitRange = 1000, userLimitArea = "";
 let selectedMarker = null, labelOverlay = null, rvMode = false, compassMode = false;
@@ -134,58 +137,52 @@ async function checkLogin() {
             }
         }
         if (auth) {
-            // 로그인 성공 시 위치 권한 먼저 체크
             if (navigator.geolocation) {
                 navigator.geolocation.getCurrentPosition((pos) => {
                     userLatLng = new kakao.maps.LatLng(pos.coords.latitude, pos.coords.longitude);
-                    initApp(); // 위치를 잡은 후 앱 실행
-                }, (err) => {
-                    alert("위치 정보를 가져올 수 없습니다. 기본 위치로 설정합니다.");
+                    initApp();
+                }, () => {
                     userLatLng = new kakao.maps.LatLng(37.5668, 126.9786);
                     initApp();
-                }, { enableHighAccuracy: true });
-            } else {
-                userLatLng = new kakao.maps.LatLng(37.5668, 126.9786);
-                initApp();
-            }
-        } else {
-            document.getElementById('error-msg').style.display = 'block';
-        }
+                });
+            } else { initApp(); }
+        } else { document.getElementById('error-msg').style.display = 'block'; }
     } catch (e) { alert("연결 실패"); }
 }
 
 function initApp() {
     document.getElementById('login-container').style.display = 'none';
     document.getElementById('main-content').style.display = 'block';
+    map = new kakao.maps.Map(document.getElementById('map'), { center: userLatLng || new kakao.maps.LatLng(37.5668, 126.9786), level: 4 });
     
-    // 수신된 사용자의 위치를 중심으로 지도 생성
-    map = new kakao.maps.Map(document.getElementById('map'), { 
-        center: userLatLng, 
-        level: 4 
-    });
-    
+    // Master 클러스터러 초기화
+    if (userRole === 'master') {
+        clustererExist = new kakao.maps.MarkerClusterer({
+            map: map, averageCenter: true, minLevel: 6,
+            styles: [{ width: '35px', height: '35px', background: 'rgba(255, 71, 87, 0.85)', color: '#fff', borderRadius: '50%', textAlign: 'center', lineHeight: '36px', fontSize: '11px', fontWeight: 'bold' }]
+        });
+        clustererSales = new kakao.maps.MarkerClusterer({
+            map: map, averageCenter: true, minLevel: 6,
+            styles: [{ width: '35px', height: '35px', background: 'rgba(0, 123, 255, 0.85)', color: '#fff', borderRadius: '50%', textAlign: 'center', lineHeight: '36px', fontSize: '11px', fontWeight: 'bold' }]
+        });
+    }
+
     rvClient = new kakao.maps.RoadviewClient();
     rv = new kakao.maps.Roadview(document.getElementById('roadview'));
 
     kakao.maps.event.addListener(map, 'click', function(e) {
         if (rvMode) {
             rvClient.getNearestPanoId(e.latLng, 50, function(id) {
-                if (id) {
-                    document.getElementById('rv-container').style.display = 'block';
-                    rv.setPanoId(id, e.latLng);
-                } else { alert("로드뷰가 불가능한 지역입니다."); }
+                if (id) { document.getElementById('rv-container').style.display = 'block'; rv.setPanoId(id, e.latLng); }
             });
-        } else {
-            closeSheet(); resetSelectedMarker();
-        }
+        } else { closeSheet(); resetSelectedMarker(); }
     });
 
-    updateUserMarker(); // 내 위치 마커 표시
-    startGPSWatch(); // 실시간 위치 감시 시작
+    updateUserMarker();
+    startGPSWatch();
     loadData();
 }
 
-// 실시간 위치 감시 (지속적인 업데이트)
 function startGPSWatch() {
     if (navigator.geolocation) {
         navigator.geolocation.watchPosition((pos) => {
@@ -198,29 +195,17 @@ function startGPSWatch() {
 function updateUserMarker() {
     const content = `<div class="user-marker-wrapper"><div id="view-cone" class="view-cone"></div><div class="rainbow-dot"></div></div>`;
     if (!userMarkerOverlay) {
-        userMarkerOverlay = new kakao.maps.CustomOverlay({
-            position: userLatLng, content: content, xAnchor: 0.5, yAnchor: 0.5, zIndex: 100
-        });
+        userMarkerOverlay = new kakao.maps.CustomOverlay({ position: userLatLng, content: content, xAnchor: 0.5, yAnchor: 0.5, zIndex: 100 });
         userMarkerOverlay.setMap(map);
-    } else {
-        userMarkerOverlay.setPosition(userLatLng);
-    }
+    } else { userMarkerOverlay.setPosition(userLatLng); }
 }
 
 function toggleRoadviewMode() {
     rvMode = !rvMode;
     const btn = document.getElementById('rv-toggle-btn');
-    if (rvMode) {
-        btn.classList.add('active');
-        map.addOverlayMapTypeId(kakao.maps.MapTypeId.ROADVIEW);
-        alert("지도를 클릭하여 로드뷰를 확인하세요.");
-    } else {
-        btn.classList.remove('active');
-        map.removeOverlayMapTypeId(kakao.maps.MapTypeId.ROADVIEW);
-        closeRoadview();
-    }
+    if (rvMode) { btn.classList.add('active'); map.addOverlayMapTypeId(kakao.maps.MapTypeId.ROADVIEW); }
+    else { btn.classList.remove('active'); map.removeOverlayMapTypeId(kakao.maps.MapTypeId.ROADVIEW); closeRoadview(); }
 }
-
 function closeRoadview() { document.getElementById('rv-container').style.display = 'none'; }
 
 function toggleCompassMode() {
@@ -228,16 +213,12 @@ function toggleCompassMode() {
     const btn = document.getElementById('compass-btn');
     const cone = document.getElementById('view-cone');
     if (compassMode) {
-        btn.classList.add('active');
-        if (cone) cone.style.display = 'block';
+        btn.classList.add('active'); if (cone) cone.style.display = 'block';
         if (typeof DeviceOrientationEvent.requestPermission === 'function') {
-            DeviceOrientationEvent.requestPermission().then(state => {
-                if (state === 'granted') window.addEventListener('deviceorientation', handleOrientation, true);
-            });
+            DeviceOrientationEvent.requestPermission().then(state => { if (state === 'granted') window.addEventListener('deviceorientation', handleOrientation, true); });
         } else { window.addEventListener('deviceorientation', handleOrientation, true); }
     } else {
-        btn.classList.remove('active');
-        if (cone) cone.style.display = 'none';
+        btn.classList.remove('active'); if (cone) cone.style.display = 'none';
         window.removeEventListener('deviceorientation', handleOrientation, true);
     }
 }
@@ -267,23 +248,38 @@ async function loadData() {
 }
 
 function refreshDataVisibility() {
+    if (clustererExist) { clustererExist.clear(); clustererSales.clear(); }
     allRawData.forEach(d => { if(d.m) d.m.setMap(null); });
+    
+    const isMaster = (userRole === 'master');
+    const mListE = [], mListS = [];
+
     allRawData.forEach(d => {
         if (!filterStatus[d.type]) return;
         const pos = new kakao.maps.LatLng(d.lat, d.lng);
-        if (userRole === 'master' || d.type === 'existing' || (d.ownerId === currentUserId)) {
+        let visible = isMaster;
+        if (!isMaster) {
+            const idMatch = (d.type === 'existing' || d.ownerId === currentUserId);
+            if (idMatch && userLatLng) {
+                const line = new kakao.maps.Polyline({ path: [userLatLng, pos] });
+                if (line.getLength() <= userLimitRange || d.addr.includes(userLimitArea)) visible = true;
+            }
+        }
+        if (visible) {
             const marker = new kakao.maps.Marker({ position: pos, image: new kakao.maps.MarkerImage(d.type === 'existing' ? existingIcon : salesIcon, new kakao.maps.Size(16, 16)) });
-            d.m = marker; marker.setMap(map);
+            d.m = marker;
             kakao.maps.event.addListener(marker, 'click', function() { highlightMarker(marker, d); showSheet(d); map.panTo(pos); });
+            if (isMaster) { if (d.type === 'existing') mListE.push(marker); else mListS.push(marker); } 
+            else { marker.setMap(map); }
         }
     });
+    if (isMaster) { clustererExist.addMarkers(mListE); clustererSales.addMarkers(mListS); }
 }
 
 function highlightMarker(marker, data) {
     resetSelectedMarker();
-    selectedMarker = marker;
-    const size = data.type === 'existing' ? 26 : 35;
-    marker.setImage(new kakao.maps.MarkerImage(data.type === 'existing' ? existingIcon : salesIcon, new kakao.maps.Size(size, size)));
+    selectedMarker = marker; selectedType = data.type;
+    marker.setImage(new kakao.maps.MarkerImage(data.type === 'existing' ? existingIcon : salesIcon, new kakao.maps.Size(30, 30)));
     labelOverlay = new kakao.maps.CustomOverlay({ position: marker.getPosition(), content: `<div class="marker-label">${data.name}</div>`, yAnchor: 2.5 });
     labelOverlay.setMap(map);
 }
@@ -299,11 +295,11 @@ function resetSelectedMarker() {
 
 function showSheet(data) {
     const content = document.getElementById('sheet-content');
-    let html = `<div style="font-size:20px; font-weight:bold; margin-bottom:5px;">${data.name}</div><div style="font-size:13px; color:#888;">${data.addr}</div><div class="sheet-grid">`;
+    let html = `<div style="font-size:20px; font-weight:bold;">${data.name}</div><div style="font-size:13px; color:#888;">${data.addr}</div><div class="sheet-grid">`;
     Object.entries(data.extra).forEach(([k, v]) => { html += `<div class="info-item">${k}<b>${v || '-'}</b></div>`; });
     html += `</div><div style="display:flex; flex-direction:column; gap:10px; margin-top:20px;">
-                <a href="https://map.kakao.com/link/to/${encodeURIComponent(data.name)},${data.lat},${data.lng}" target="_blank" class="sheet-btn" style="background:var(--kakao-yellow); color:#3C1E1E;">🚕 길찾기</a>`;
-    if (data.type === 'new') html += `<a href="https://walla.my/v/GEQSSOWtFYHulcSoAKC3" target="_blank" class="sheet-btn" style="background:var(--lead-green); color:white;">📝 리드건 신청</a>`;
+                <a href="https://map.kakao.com/link/to/${encodeURIComponent(data.name)},${data.lat},${data.lng}" target="_blank" class="sheet-btn" style="background:var(--kakao-yellow); border-radius:12px; text-decoration:none; font-weight:bold; color:#3C1E1E;">🚕 길찾기</a>`;
+    if (data.type === 'new') html += `<a href="https://walla.my/v/GEQSSOWtFYHulcSoAKC3" target="_blank" class="sheet-btn" style="background:var(--lead-green); color:white; border-radius:12px; text-decoration:none; font-weight:bold;">📝 리드건 신청</a>`;
     html += `</div>`;
     content.innerHTML = html;
     document.getElementById('bottom-sheet').classList.add('active');
